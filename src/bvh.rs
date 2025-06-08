@@ -1,5 +1,5 @@
 use crate::{aabb::Aabb, tri::Tri, BIN_COUNT};
-use bevy::{math::vec3, prelude::*, reflect::TypeUuid};
+use bevy::{math::vec3, prelude::*};
 
 #[derive(Default, Debug, Clone, Copy)]
 pub struct BvhNode {
@@ -56,8 +56,7 @@ impl BvhInstance {
     }
 }
 
-#[derive(Default, Component, Debug, TypeUuid)]
-#[uuid = "81299f9d-41e0-4ff0-86b7-6bef6c3f67c1"]
+#[derive(Default, Component, Debug)]
 pub struct Bvh {
     pub nodes: Vec<BvhNode>,
     pub tris: Vec<Tri>,

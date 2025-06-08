@@ -16,7 +16,7 @@ impl TlasNode {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Resource)]
 pub struct Tlas {
     pub tlas_nodes: Vec<TlasNode>,    
     pub blas: Vec<BvhInstance>,

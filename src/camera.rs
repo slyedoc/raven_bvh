@@ -53,11 +53,12 @@ impl BvhCamera {
     }
 
     pub fn update(&mut self, trans: &GlobalTransform) {
-        self.origin = trans.translation;
+        let t = trans.compute_transform();
+        self.origin = t.translation;
 
-        self.w = -trans.forward();
-        self.u = trans.right();
-        self.v = trans.up();
+        self.w = -t.forward().as_vec3();
+        self.u = t.right().as_vec3();
+        self.v = t.up().as_vec3();
 
         self.horizontal = self.focus_dist * self.viewport_width * self.u;
         self.vertical = self.focus_dist * self.viewport_height * self.v;

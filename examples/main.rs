@@ -2,27 +2,72 @@
 mod helpers;
 use std::f32::consts::PI;
 
-use bevy::{math::vec3, prelude::*, window::PresentMode};
+use bevy::{color::palettes::tailwind, math::vec3, prelude::*, window::PresentMode};
 //use bevy_prototype_debug_lines::{DebugLines, DebugLinesPlugin};
-use bevy_slyedoc_bvh::prelude::*;
 use helpers::*;
+use raven_bvh::prelude::*;
+
+use crate::helpers::camera_free::CameraFree;
 
 fn main() {
     App::new()
-        .insert_resource(WindowDescriptor {
-            present_mode: PresentMode::Fifo,
-            ..default()
-        })
-        .add_plugins(DefaultPlugins)
-        .add_plugin(HelperPlugin) // See cusor plugin in helper plugins
-        .add_plugin(BvhPlugin)
-        //.add_plugin(DebugLinesPlugin::default())
-        .add_startup_system(helpers::setup_cameras)
-        .add_startup_system(helpers::load_enviroment)
-        //.add_startup_system(helpers::load_sponza)
-        .add_startup_system(load_test)
-        //.add_system(camera_gizmo)
+        .add_plugins((DefaultPlugins, HelperPlugin, BvhPlugin))
+        .add_systems(Startup, setup)
         .run();
+}
+
+fn setup(
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+) {
+    // camera
+    commands.spawn((
+        Name::new("Main Camera"),
+        CameraFree, // Helper to move the camera around with WASD and mouse look with right mouse button
+        Camera3d::default(),
+        Camera {
+            hdr: true,
+            ..default()
+        },
+        Transform::from_xyz(0.0, 2.0, 5.0).looking_at(Vec3::ZERO, Vec3::Y),
+        BvhCamera::new(800, 600),
+    ));
+
+    // light
+    commands.spawn((
+        DirectionalLight::default(),
+        Transform::from_xyz(50.0, 50.0, 50.0).looking_at(Vec3::ZERO, Vec3::Y),
+    ));
+
+    //ground
+    commands.spawn((
+        Name::new("Ground"),
+        Transform::from_xyz(0.0, 0.0, 0.0),
+        Mesh3d(meshes.add(Plane3d::new(Vec3::Y, Vec2::splat(50.)))),
+        MeshMaterial3d(materials.add(StandardMaterial {
+            base_color: tailwind::GREEN_900.into(),
+            ..default()
+        })),
+        BvhInit, // This Marker will have our mesh added
+    ));
+
+    let mesh_complexity = 3;
+    for (position, size, complexity, color) in [
+        (vec3(-3.0, 1.0, 0.0), 2.0, 12, tailwind::YELLOW_400),
+        (vec3(3.0, 1.0, 0.0), 2.0, 12, tailwind::BLUE_400),
+    ] {
+        commands.spawn((
+            Name::new("Target"),
+            Transform::from_translation(position),
+            Mesh3d(meshes.add(Sphere { radius: size }.mesh())),
+            MeshMaterial3d(materials.add(StandardMaterial {
+                base_color: color.into(),
+                ..default()
+            })),
+            BvhInit,
+        ));
+    }
 }
 
 // #[allow(dead_code)]
@@ -46,32 +91,3 @@ fn main() {
 //         }
 //     }
 // }
-
-fn load_test(
-    mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
-) {
-    let mesh_complexity = 3;
-    for (position, size, complexity, color) in [
-        (vec3(-3.0, 1.0, 0.0), 2.0, 12, Color::YELLOW),
-        (vec3(3.0, 1.0, 0.0), 2.0, 12, Color::BLUE),
-    ] {
-        commands
-            .spawn_bundle(PbrBundle {
-                transform: Transform::from_translation(position),
-                mesh: meshes.add(Mesh::from(shape::UVSphere {
-                    radius: size,
-                    sectors: complexity,
-                    stacks: complexity,
-                })),
-                material: materials.add(StandardMaterial {
-                    base_color: color,
-                    ..default()
-                }),
-                ..default()
-            })
-            .insert(BvhInit)
-            .insert(Name::new("Target"));
-    }
-}
