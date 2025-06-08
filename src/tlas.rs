@@ -1,7 +1,6 @@
 use bevy::prelude::*;
 
-
-use crate::{ Bvh, BvhInstance, Aabb};
+use crate::{ aabb::Aabb, Bvh, BvhInstance};
 
 #[derive(Default, Debug, Copy, Clone)]
 pub struct TlasNode {

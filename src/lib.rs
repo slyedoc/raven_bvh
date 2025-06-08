@@ -121,15 +121,14 @@ pub fn parse_mesh(mesh: &Mesh) -> Vec<Tri> {
     use bevy::render::mesh::Indices;
     match mesh.primitive_topology() {
         bevy::render::mesh::PrimitiveTopology::TriangleList => {
-            let indexes = match mesh.indices().expect("No Indices") {
+            let indexes = match mesh.indices().expect("Mesh should have Indices") {
                 Indices::U32(vec) => vec,
                 Indices::U16(vec) => &vec.iter().map(|i| *i as u32).collect::<Vec<_>>(),
             };
-            //dbg!("Indexes len: {}", indexes.len());
 
             let verts = match mesh
                 .attribute(Mesh::ATTRIBUTE_POSITION)
-                .expect("No Position Attribute")
+                .expect("Mesh should have Position Attribute")
             {
                 bevy::render::mesh::VertexAttributeValues::Float32x3(vec) => {
                     vec.iter().map(|vec| vec3(vec[0], vec[1], vec[2]))
