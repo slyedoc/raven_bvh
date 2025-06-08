@@ -1,3 +1,6 @@
+#![feature(test)]
+extern crate test;
+
 use bevy::{math::vec3, prelude::*, transform::TransformSystem};
 
 mod aabb;

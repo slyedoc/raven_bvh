@@ -6,7 +6,7 @@ use crate::{
     bvh::{Bvh, BvhInstance},
     aabb::Aabb,    
 };
-use bevy::{math::bounding::RayCast3d, prelude::*};
+use bevy::prelude::*;
 
 #[derive(Debug, Clone, Copy)]
 pub struct Hit {
@@ -56,9 +56,6 @@ impl Default for Ray {
 
 impl Ray {
     pub fn new(origin: Vec3, direction: Vec3) -> Self {
-
-        let r = RayCast3d::new( Vec3::ZERO, Dir3A::new(Vec3::Z.into()).unwrap(), 10.);
-
         let direction_inv = direction.recip();
         Self {
             origin,

@@ -59,14 +59,14 @@ rand = "0.9"
 rand_chacha = "0.9"
 #sly_camera_controller = { git = "https://github.com/slyedoc/sly_camera_controller", branch = "main" }
 #tracing = "0.1.34"
-criterion = { version = "0.6", features = ["html_reports"] }
+#criterion = { version = "0.6", features = ["html_reports"] }
 image = "0.25"
 
 
 [[bench]]
-name = "bvh"
+name = "random_scene"
 required-features = ["camera"]
-harness = false
+harness = true
 
 
 [[example]]
