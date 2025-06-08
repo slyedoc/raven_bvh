@@ -31,7 +31,7 @@ fn setup(
             ..default()
         },
         Transform::from_xyz(0.0, 2.0, 5.0).looking_at(Vec3::ZERO, Vec3::Y),
-        BvhCamera::new(800, 600),
+        BvhCamera::new(256, 256),
     ));
 
     // light
@@ -49,7 +49,7 @@ fn setup(
             base_color: tailwind::GREEN_900.into(),
             ..default()
         })),
-        BvhInit, // This Marker will have our mesh added
+        BvhMesh, // This Marker will have our mesh added
     ));
 
     let mesh_complexity = 3;
@@ -65,29 +65,7 @@ fn setup(
                 base_color: color.into(),
                 ..default()
             })),
-            BvhInit,
+            BvhMesh,
         ));
     }
 }
-
-// #[allow(dead_code)]
-// pub fn camera_gizmo(
-//     mut commands: Commands,
-//     mut lines: ResMut<DebugLines>,
-//     camera_query: Query<(&BvhCamera)>,
-// ) {
-//     if let Ok(camera) = camera_query.get_single() {
-//         let start = camera.origin;
-//         let duration = 0.0;
-
-//         // Draw frustum lines
-//         Ray::default();
-//         for i in 0..4 {
-//             let u = if i % 2 == 0 { 0.0 } else { 1.0 };
-//             let v = if i < 2 { 0.0 } else { 1.0 };
-//             let mut ray = camera.get_ray(u, v);
-//             let end = camera.origin + (ray.direction * ray.distance);
-//             lines.line(start, end, duration);
-//         }
-//     }
-// }

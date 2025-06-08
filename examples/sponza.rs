@@ -1,11 +1,11 @@
 mod helpers;
-use bevy::{color::palettes::tailwind, prelude::*, window::PresentMode};
 use helpers::*;
-use raven_bvh::prelude::*;
 
+use bevy::prelude::*;
+use raven_bvh::prelude::*;
 use crate::helpers::camera_free::CameraFree;
 
-// Example using BvhInitWithChildren for a scene load
+/// Example using [`BvhScene`] for a scene load, this is pushing the limits of this example but it works
 fn main() {
     App::new()
         .add_plugins((
@@ -19,8 +19,8 @@ fn main() {
 
 fn setup(
     mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
+    mut _meshes: ResMut<Assets<Mesh>>,
+    mut _materials: ResMut<Assets<StandardMaterial>>,
     asset_server: Res<AssetServer>,
 ) {
     // camera
@@ -33,31 +33,14 @@ fn setup(
             ..default()
         },
         Transform::from_xyz(0.0, 2.0, 5.0).looking_at(Vec3::ZERO, Vec3::Y),
-        BvhCamera::new(256, 256),
+        BvhCamera::new(128, 128),
     ));
 
     // light
     commands.spawn((
         DirectionalLight::default(),
         Transform::from_xyz(50.0, 50.0, 50.0).looking_at(Vec3::ZERO, Vec3::Y),
-    ));
-
-    // for (position, size, roughness, color) in [
-    //     (vec3(-3.0, 1.0, 0.0), 2.0, 1.0, tailwind::YELLOW_400),
-    //     (vec3(3.0, 1.0, 0.0), 2.0, 0.0, tailwind::BLUE_400),
-    // ] {
-    //     commands.spawn((
-    //         Name::new("Target"),
-    //         Transform::from_translation(position),
-    //         Mesh3d(meshes.add(Sphere { radius: size }.mesh())),
-    //         MeshMaterial3d(materials.add(StandardMaterial {
-    //             base_color: color.into(),
-    //             perceptual_roughness: roughness,
-    //             ..default()
-    //         })),
-    //         BvhInit,
-    //     ));
-    // }
+    ));    
 
     commands.spawn((
         Name::new("Sponza"),
@@ -66,7 +49,7 @@ fn setup(
             asset_server.load(GltfAssetLabel::Scene(0).from_asset("models/sponza/sponza.gltf")),
         ),
         // This marker tells the BVH system to build nested children
-        // for this entity, the handle is used to wait till asset is loaded
-        BvhInitWithChildren,
+        // for this entity, waits till asset is loaded
+        BvhScene,
     ));
 }

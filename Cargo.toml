@@ -36,6 +36,7 @@ inherits = "dev"
 
 [features]
 default = []
+camera = []
 trace = []
 save = [] # to test benchmark output
 
@@ -62,11 +63,24 @@ criterion = { version = "0.6", features = ["html_reports"] }
 image = "0.25"
 
 
-# for testing
-#bevy_mod_raycast = "0.5.0"
-#bevy_prototype_debug_lines = { version = "0.7.1", features = ["3d"] }
-#{ git = "https://github.com/aevyrie/bevy_mod_raycast", branch = "main"}
-
 [[bench]]
 name = "bvh"
+required-features = ["camera"]
 harness = false
+
+
+[[example]]
+name = "main"
+required-features = ["camera"]
+
+[[example]]
+name = "sponza"
+required-features = ["camera"]
+
+[[example]]
+name = "clock_tower"
+required-features = ["camera"]
+
+[[example]]
+name = "minimal"
+required-features = ["camera"]

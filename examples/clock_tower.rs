@@ -29,7 +29,7 @@ fn setup(
             ..default()
         },
         Transform::from_xyz(0.0, 2.0, 5.0).looking_at(Vec3::ZERO, Vec3::Y),
-        BvhCamera::new(800, 600),
+        BvhCamera::new(256, 256),
     ));
 
     commands.spawn((
@@ -49,7 +49,7 @@ fn setup(
             base_color: tailwind::GREEN_900.into(),
             ..default()
         })),
-        BvhInit, // This Marker will have our mesh added
+        BvhMesh, // This Marker will have our mesh added
     ));
 
     commands.spawn((
@@ -60,6 +60,6 @@ fn setup(
         ),
         // This marker tells the BVH system to build nested children
         // for this entity, the handle is used to wait till asset is loaded
-        BvhInitWithChildren,
+        BvhScene,
     ));
 }

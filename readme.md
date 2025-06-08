@@ -18,7 +18,7 @@ How does that hardware help, in short:
 
 > RTX cards feature fixed-function "RT cores" that are designed to accelerate mathematical operations needed to simulate rays, such as bounding volume hierarchy traversal.  - [wikipedia](https://en.wikipedia.org/wiki/Nvidia_RTX#Ray_tracing)
 
-These cores speed up the BVH traversal, but the acceleration structure is computed on the cpu.  This project is an experiment on building the bvh natively in bevy, and then using it for things like mouse cursor or an agent's sensors.  Of coarse if you have a bvh, you are going to try raytracing with it. =-)
+These cores speed up the BVH traversal, but the acceleration structure is computed on the cpu.  This project is an experiment on building the bvh natively in bevy.  Of coarse if you have a bvh, you are going to try raytracing with it. =-)
 
 ## Overview
 
