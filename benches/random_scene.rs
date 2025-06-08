@@ -10,14 +10,34 @@ use rand_chacha::{ChaChaRng, rand_core::SeedableRng};
 use raven_bvh::prelude::*;
 use test::{Bencher, black_box};
 
+#[test]
+fn scene_1k_1024() {
+    random_scene(1024, 10, 100, true);
+}
+
+#[test]
+fn scene_100k_1024() {
+    random_scene(1024, 100, 1000, true);
+}
+
 #[bench]
-pub fn random_scene(b: &mut Bencher) {
-    let tlas = build_random_tri_scene(100, 1000);
+fn random_scene_1k_256(b: &mut Bencher) {
+    b.iter(|| {
+        random_scene(256, 10, 100, false);
+    });
+}
 
-    let img_size = 256;
+#[bench]
+pub fn random_scene_100k_256(b: &mut Bencher) {
+    b.iter(|| {
+        random_scene(256, 100, 1000, false);
+    });
+}
 
-    let mut camera = BvhCamera::new(img_size, img_size);
+pub fn random_scene(image_size: u32, groups: u32, tri_per_group: u32, save: bool) {
+    let tlas = build_random_tri_scene(groups, tri_per_group);
 
+    let mut camera = BvhCamera::new(image_size, image_size);
     // Bench: update camera with trans, since we dont get updated by a service here
     camera.update(&GlobalTransform::from(Transform {
         translation: vec3(0.0, 40.0, 100.0),
@@ -25,49 +45,46 @@ pub fn random_scene(b: &mut Bencher) {
         ..Default::default()
     }));
 
-    b.iter(|| {
-        let mut img = RgbImage::new(camera.width, camera.height);
-        // TODO: this tiling doesnt work all resolutions, but its faster, so leaving it in for now
-        let grid_edge_divisions: u32 = camera.width / 8;
-        for grid_x in 0..grid_edge_divisions {
-            for grid_y in 0..grid_edge_divisions {
-                for u in 0..(camera.width / grid_edge_divisions) {
-                    for v in 0..(camera.height / grid_edge_divisions) {
-                        // PERF: calculating an offset 2 loops up is slower than doing it in the inter loop
-                        let x = (grid_x * camera.width / grid_edge_divisions) + u;
-                        let y = (grid_y * camera.height / grid_edge_divisions) + v;
-                        let mut ray = camera.get_ray(
-                            x as f32 / camera.width as f32,
-                            // TODO: image still reversed
-                            y as f32 / camera.height as f32,
-                        );
-                        let color = if let Some(hit) = ray.intersect_tlas(&tlas) {
-                            let c = vec3(hit.u, hit.v, 1.0 - (hit.u + hit.v)) * 255.0;
-                            Rgb([c.x as u8, c.y as u8, c.z as u8])
-                        } else {
-                            Rgb([0, 0, 0])
-                        };
-                        img[(x, camera.height - 1 - y)] = color;
-                    }
+    let mut img = RgbImage::new(camera.width, camera.height);
+    // TODO: this tiling doesnt work all resolutions, but its faster, so leaving it in for now
+    let grid_edge_divisions: u32 = camera.width / 8;
+    for grid_x in 0..grid_edge_divisions {
+        for grid_y in 0..grid_edge_divisions {
+            for u in 0..(camera.width / grid_edge_divisions) {
+                for v in 0..(camera.height / grid_edge_divisions) {
+                    // PERF: calculating an offset 2 loops up is slower than doing it in the inter loop
+                    let x = (grid_x * camera.width / grid_edge_divisions) + u;
+                    let y = (grid_y * camera.height / grid_edge_divisions) + v;
+                    let mut ray = camera.get_ray(
+                        x as f32 / camera.width as f32,
+                        // TODO: image still reversed
+                        y as f32 / camera.height as f32,
+                    );
+                    let color = if let Some(hit) = ray.intersect_tlas(&tlas) {
+                        let c = vec3(hit.u, hit.v, 1.0 - (hit.u + hit.v)) * 255.0;
+                        Rgb([c.x as u8, c.y as u8, c.z as u8])
+                    } else {
+                        Rgb([0, 0, 0])
+                    };
+                    img[(x, camera.height - 1 - y)] = color;
                 }
             }
         }
-        #[cfg(feature = "save")]
-        {
-            let name = format!(
-                "random_{}k_tri_{}x{}",
-                (100 * 1000) as f32 / 1000.0,
-                img_size,
-                img_size
-            );
-            img.save(format!("tmp/bench_{}.png", name)).unwrap();
-        }
+    }
 
-        black_box(img);
-    });
+    if save {
+        img.save(format!(
+            "tmp/bench_{}tris_{}.png",
+            groups * tri_per_group,
+            image_size
+        ))
+        .unwrap();
+    }
+
+    black_box(img);
 }
 
-pub fn build_random_tri_scene(group_count: usize, tri_per_group: u32) -> Tlas {
+pub fn build_random_tri_scene(group_count: u32, tri_per_group: u32) -> Tlas {
     fn random_vec3(rng: &mut impl Rng) -> Vec3 {
         vec3(
             rng.random_range(-1.0..=1.0),
