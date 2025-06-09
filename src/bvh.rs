@@ -1,11 +1,5 @@
 use crate::{BIN_COUNT, aabb::Aabb3dExt, tri::Tri};
-use bevy::{
-    math::{
-        bounding::{Aabb3d, BoundingVolume},
-        vec3,
-    },
-    prelude::*,
-};
+use bevy::{math::bounding::Aabb3d, prelude::*};
 
 #[derive(Debug, Clone, Copy)]
 pub struct BvhNode {
@@ -134,6 +128,10 @@ impl Bvh {
         for i in 0..node.tri_count {
             let leaf_tri_index = self.triangle_indexs[(node.left_first + i) as usize];
             let leaf_tri = self.tris[leaf_tri_index];
+            // node.aabb.expand(leaf_tri.vertex0);
+            // node.aabb.expand(leaf_tri.vertex1);
+            // node.aabb.expand(leaf_tri.vertex2);
+
             node.aabb.min = node.aabb.min.min(leaf_tri.vertex0);
             node.aabb.min = node.aabb.min.min(leaf_tri.vertex1);
             node.aabb.min = node.aabb.min.min(leaf_tri.vertex2);
