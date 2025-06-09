@@ -1,12 +1,22 @@
-use bevy::prelude::*;
+use bevy::{math::bounding::Aabb3d, prelude::*};
 
-use crate::{ aabb::Aabb, Bvh, BvhInstance};
+use crate::{ aabb::Aabb3dExt, Bvh, BvhInstance};
 
-#[derive(Default, Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub struct TlasNode {
-    pub aabb: Aabb,
+    pub aabb: Aabb3d,
     pub left_right: u32, // 2x16 bits    
     pub blas: u32,
+}
+
+impl Default for TlasNode {
+    fn default() -> Self {
+        TlasNode {
+            aabb: Aabb3d::init(),
+            left_right: 0,
+            blas: 0,
+        }
+    }
 }
 
 impl TlasNode {
@@ -33,6 +43,10 @@ impl Default for Tlas {
 }
 
 impl Tlas {
+    pub fn triangle_count(&self) -> usize {
+        self.bvhs.iter().map(|bvh| bvh.tris.len()).sum()
+    }
+
     pub fn add_bvh(&mut self, bvh: Bvh) -> usize {
         self.bvhs.push(bvh);
         self.bvhs.len() - 1
@@ -72,9 +86,9 @@ impl Tlas {
                 let node_a = &self.tlas_nodes[node_index_a as usize];
                 let node_b = &self.tlas_nodes[node_index_b as usize];
                 self.tlas_nodes.push(TlasNode {
-                    aabb: Aabb {
-                        bmin: node_a.aabb.bmin.min(node_b.aabb.bmin),
-                        bmax: node_a.aabb.bmax.max(node_b.aabb.bmax),
+                    aabb: Aabb3d {
+                        min: node_a.aabb.min.min(node_b.aabb.min),
+                        max: node_a.aabb.max.max(node_b.aabb.max),
                     },
                     left_right: node_index_a + (node_index_b << 16),
                     blas: 0,
@@ -97,11 +111,11 @@ impl Tlas {
         for b in 0..n {
             if b != a {
                 let bmax = self.tlas_nodes[list[a as usize] as usize]
-                    .aabb.bmax
-                    .max(self.tlas_nodes[list[b as usize] as usize].aabb.bmax);
+                    .aabb.max
+                    .max(self.tlas_nodes[list[b as usize] as usize].aabb.max);
                 let bmin = self.tlas_nodes[list[a as usize] as usize]
-                    .aabb.bmin
-                    .min(self.tlas_nodes[list[b as usize] as usize].aabb.bmin);
+                    .aabb.min
+                    .min(self.tlas_nodes[list[b as usize] as usize].aabb.min);
                 let e = bmax - bmin;
                 let surface_area = e.x * e.y + e.y * e.z + e.z * e.x;
                 if surface_area < smallest {

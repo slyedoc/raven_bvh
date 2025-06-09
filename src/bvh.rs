@@ -1,11 +1,27 @@
-use crate::{aabb::Aabb, tri::Tri, BIN_COUNT};
-use bevy::{math::vec3, prelude::*};
+use crate::{BIN_COUNT, aabb::Aabb3dExt, tri::Tri};
+use bevy::{
+    math::{
+        bounding::{Aabb3d, BoundingVolume},
+        vec3,
+    },
+    prelude::*,
+};
 
-#[derive(Default, Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub struct BvhNode {
-    pub aabb: Aabb,
+    pub aabb: Aabb3d,
     pub left_first: u32,
     pub tri_count: u32,
+}
+
+impl Default for BvhNode {
+    fn default() -> Self {
+        BvhNode {
+            aabb: Aabb3d::init(),
+            left_first: 0,
+            tri_count: 0,
+        }
+    }
 }
 
 impl BvhNode {
@@ -14,9 +30,8 @@ impl BvhNode {
     }
 
     pub fn calculate_cost(&self) -> f32 {
-        let e = self.aabb.bmax - self.aabb.bmin; // extent of the node
-        let surface_area = e.x * e.y + e.y * e.z + e.z * e.x;
-        self.tri_count as f32 * surface_area
+        let area = self.aabb.area();
+        self.tri_count as f32 * area
     }
 }
 
@@ -25,7 +40,7 @@ pub struct BvhInstance {
     pub entity: Entity,
     pub bvh_index: usize,
     pub inv_trans: Mat4,
-    pub bounds: Aabb,
+    pub bounds: Aabb3d,
 }
 
 impl BvhInstance {
@@ -34,7 +49,7 @@ impl BvhInstance {
             entity,
             bvh_index,
             inv_trans: Mat4::default(),
-            bounds: Aabb::default(),
+            bounds: Aabb3d::init(),
         }
     }
 
@@ -44,10 +59,10 @@ impl BvhInstance {
         self.inv_trans = trans_matrix.inverse();
 
         // calculate world-space bounds using the new matrix
-        let bmin = root.aabb.bmin;
-        let bmax = root.aabb.bmax;
+        let bmin = root.aabb.min;
+        let bmax = root.aabb.max;
         for i in 0..8 {
-            self.bounds.grow(trans_matrix.transform_point3(vec3(
+            self.bounds.expand(trans_matrix.transform_point3a(vec3a(
                 if i & 1 != 0 { bmax.x } else { bmin.x },
                 if i & 2 != 0 { bmax.y } else { bmin.y },
                 if i & 4 != 0 { bmax.z } else { bmin.z },
@@ -75,12 +90,12 @@ impl Bvh {
                 nodes.push(BvhNode {
                     left_first: 0,
                     tri_count: count,
-                    aabb: Aabb::default(),
+                    aabb: Aabb3d::init(),
                 });
                 nodes.push(BvhNode {
                     left_first: 0,
                     tri_count: 0,
-                    aabb: Aabb::default(),
+                    aabb: Aabb3d::init(),
                 });
                 nodes
             },
@@ -114,17 +129,17 @@ impl Bvh {
 
     fn update_node_bounds(&mut self, node_idx: usize) {
         let node = &mut self.nodes[node_idx];
-        node.aabb.bmin = Vec3::splat(1e30f32);
-        node.aabb.bmax = Vec3::splat(-1e30f32);
+        node.aabb.min = Vec3A::splat(1e30f32);
+        node.aabb.max = Vec3A::splat(-1e30f32);
         for i in 0..node.tri_count {
             let leaf_tri_index = self.triangle_indexs[(node.left_first + i) as usize];
             let leaf_tri = self.tris[leaf_tri_index];
-            node.aabb.bmin = node.aabb.bmin.min(leaf_tri.vertex0);
-            node.aabb.bmin = node.aabb.bmin.min(leaf_tri.vertex1);
-            node.aabb.bmin = node.aabb.bmin.min(leaf_tri.vertex2);
-            node.aabb.bmax = node.aabb.bmax.max(leaf_tri.vertex0);
-            node.aabb.bmax = node.aabb.bmax.max(leaf_tri.vertex1);
-            node.aabb.bmax = node.aabb.bmax.max(leaf_tri.vertex2);
+            node.aabb.min = node.aabb.min.min(leaf_tri.vertex0);
+            node.aabb.min = node.aabb.min.min(leaf_tri.vertex1);
+            node.aabb.min = node.aabb.min.min(leaf_tri.vertex2);
+            node.aabb.max = node.aabb.max.max(leaf_tri.vertex0);
+            node.aabb.max = node.aabb.max.max(leaf_tri.vertex1);
+            node.aabb.max = node.aabb.max.max(leaf_tri.vertex2);
         }
     }
 
@@ -203,9 +218,9 @@ impl Bvh {
                 let bin_idx =
                     (BIN_COUNT - 1).min(((triangle.centroid[a] - bounds_min) * scale) as usize);
                 bin[bin_idx].tri_count += 1;
-                bin[bin_idx].bounds.grow(triangle.vertex0);
-                bin[bin_idx].bounds.grow(triangle.vertex1);
-                bin[bin_idx].bounds.grow(triangle.vertex2);
+                bin[bin_idx].bounds.expand(triangle.vertex0);
+                bin[bin_idx].bounds.expand(triangle.vertex1);
+                bin[bin_idx].bounds.expand(triangle.vertex2);
             }
 
             // gather data for the BINS - 1 planes between the bins
@@ -213,18 +228,18 @@ impl Bvh {
             let mut right_area = [0.0f32; BIN_COUNT - 1];
             let mut left_count = [0u32; BIN_COUNT - 1];
             let mut right_count = [0u32; BIN_COUNT - 1];
-            let mut left_box = Aabb::default();
-            let mut right_box = Aabb::default();
+            let mut left_box = Aabb3d::init();
+            let mut right_box = Aabb3d::init();
             let mut left_sum = 0u32;
             let mut right_sum = 0u32;
             for i in 0..(BIN_COUNT - 1) {
                 left_sum += bin[i].tri_count;
                 left_count[i] = left_sum;
-                left_box.grow_aabb(&bin[i].bounds);
+                left_box.expand_aabb(&bin[i].bounds);
                 left_area[i] = left_box.area();
                 right_sum += bin[BIN_COUNT - 1 - i].tri_count;
                 right_count[BIN_COUNT - 2 - i] = right_sum;
-                right_box.grow_aabb(&bin[BIN_COUNT - 1 - i].bounds);
+                right_box.expand_aabb(&bin[BIN_COUNT - 1 - i].bounds);
                 right_area[BIN_COUNT - 2 - i] = right_box.area();
             }
 
@@ -244,8 +259,17 @@ impl Bvh {
     }
 }
 
-#[derive(Default, Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone)]
 struct Bin {
-    bounds: Aabb,
+    bounds: Aabb3d,
     tri_count: u32,
+}
+
+impl Default for Bin {
+    fn default() -> Self {
+        Bin {
+            bounds: Aabb3d::init(),
+            tri_count: 0,
+        }
+    }
 }

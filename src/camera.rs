@@ -1,6 +1,8 @@
-use crate::{ray::Ray, BvhSystems};
+use crate::util::TlasIntersect;
+use crate::{BvhSystems};
 
 use crate::tlas::Tlas;
+use bevy::math::bounding::RayCast3d;
 use bevy::{
     asset::RenderAssetUsages,
     math::vec3,
@@ -79,13 +81,12 @@ impl BvhCamera {
         }
     }
 
-    pub fn update(&mut self, trans: &GlobalTransform) {
-        let t = trans.compute_transform();
-        self.origin = t.translation;
+    pub fn update(&mut self, trans: &Transform) {        
+        self.origin = trans.translation;
 
-        self.w = -t.forward().as_vec3();
-        self.u = t.right().as_vec3();
-        self.v = t.up().as_vec3();
+        self.w = -trans.forward().as_vec3();
+        self.u = trans.right().as_vec3();
+        self.v = trans.up().as_vec3();
 
         self.horizontal = self.focus_dist * self.viewport_width * self.u;
         self.vertical = self.focus_dist * self.viewport_height * self.v;
@@ -94,17 +95,11 @@ impl BvhCamera {
             self.origin - self.horizontal / 2.0 - self.vertical / 2.0 - self.focus_dist * self.w;
     }
 
-    pub fn get_ray(&self, u: f32, v: f32) -> Ray {
+    pub fn get_ray(&self, u: f32, v: f32) -> RayCast3d {
         let direction = (self.lower_left_corner + u * self.horizontal + v * self.vertical
             - self.origin)
             .normalize();
-        Ray {
-            origin: self.origin,
-            direction,
-            direction_inv: direction.recip(),
-            distance: 1e30f32,
-            hit: None,
-        }
+        RayCast3d::new(self.origin, Dir3A::new_unchecked(direction.into()), 1e30f32) 
     }
 }
 
@@ -130,7 +125,7 @@ pub fn init_camera_image(
 
 pub fn update_camera(mut camera_query: Query<(&mut BvhCamera, &GlobalTransform)>) {
     for (mut camera, trans) in camera_query.iter_mut() {
-        camera.update(trans);
+        camera.update(&trans.compute_transform());
     }
 }
 
@@ -161,7 +156,7 @@ pub fn render_camera(
                     //     u += rng.gen::<f32>() / camera.width as f32;
                     //     v += rng.gen::<f32>() / camera.height as f32;
                     // }                    
-                    let mut ray = camera.get_ray(u, 1.0 - v);
+                    let ray = camera.get_ray(u, 1.0 - v);
                     let color = if let Some(hit) = ray.intersect_tlas(&tlas) {
                         vec3(hit.u, hit.v, 1.0 - (hit.u + hit.v)) * 255.0
                     } else {

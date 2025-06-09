@@ -1,7 +1,7 @@
 mod helpers;
 use helpers::*;
 
-use bevy::{color::palettes::tailwind, prelude::*, window::PresentMode};
+use bevy::{color::palettes::tailwind, prelude::*};
 use raven_bvh::prelude::*;
 
 use crate::helpers::camera_free::CameraFree;

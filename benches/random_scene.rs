@@ -4,7 +4,7 @@ extern crate test;
 use std::f32::consts::PI;
 
 use bevy::prelude::*;
-use image::{Rgb, RgbImage};
+use image::{ImageBuffer, Rgb, RgbImage};
 use rand::prelude::*;
 use rand_chacha::{ChaChaRng, rand_core::SeedableRng};
 use raven_bvh::prelude::*;
@@ -12,39 +12,78 @@ use test::{Bencher, black_box};
 
 #[test]
 fn scene_1k_1024() {
-    random_scene(1024, 10, 100, true);
+    let tlas = build_random_tri_scene(10, 100);
+    let mut camera = BvhCamera::new(1024, 1024);
+    camera.update(&Transform {
+        translation: vec3(0.0, 40.0, 100.0),
+        rotation: Quat::from_axis_angle(Vec3::X, -PI / 6.0),
+        ..Default::default()
+    });
+
+    let img = render_camera(&tlas, &camera);
+    img.save(format!(
+        "tmp/random_{:0}k_{}x{}.png",
+        tlas.triangle_count() / 1000,
+        camera.width,
+        camera.height
+    ))
+    .unwrap();
 }
 
 #[test]
 fn scene_100k_1024() {
-    random_scene(1024, 100, 1000, true);
+    let tlas = build_random_tri_scene(100, 1000);
+    let mut camera = BvhCamera::new(1024, 1024);
+
+    camera.update(&Transform {
+        translation: vec3(0.0, 40.0, 100.0),
+        rotation: Quat::from_axis_angle(Vec3::X, -PI / 6.0),
+        ..Default::default()
+    });
+
+    let img = render_camera(&tlas, &camera);
+    img.save(format!(
+        "tmp/random_{:0}k_{}x{}.png",
+        tlas.triangle_count() / 1000,
+        camera.width,
+        camera.height
+    ))
+    .unwrap();
 }
 
 #[bench]
 fn random_scene_1k_256(b: &mut Bencher) {
     b.iter(|| {
-        random_scene(256, 10, 100, false);
+        let tlas = build_random_tri_scene(10, 100);
+        let mut camera = BvhCamera::new(256, 256);
+        // Bench: update camera with trans, since we dont get updated by a service here
+        camera.update(&Transform {
+            translation: vec3(0.0, 40.0, 100.0),
+            rotation: Quat::from_axis_angle(Vec3::X, -PI / 6.0),
+            ..Default::default()
+        });
+ 
+        black_box(render_camera(&tlas, &camera));
     });
 }
 
 #[bench]
 pub fn random_scene_100k_256(b: &mut Bencher) {
     b.iter(|| {
-        random_scene(256, 100, 1000, false);
+        let tlas = build_random_tri_scene(100, 1000);
+        let mut camera = BvhCamera::new(256, 256);
+        // Bench: update camera with trans, since we dont get updated by a service here
+        camera.update(&Transform {
+            translation: vec3(0.0, 40.0, 100.0),
+            rotation: Quat::from_axis_angle(Vec3::X, -PI / 6.0),
+            ..Default::default()
+        });
+
+        black_box(render_camera(&tlas, &camera));
     });
 }
 
-pub fn random_scene(image_size: u32, groups: u32, tri_per_group: u32, save: bool) {
-    let tlas = build_random_tri_scene(groups, tri_per_group);
-
-    let mut camera = BvhCamera::new(image_size, image_size);
-    // Bench: update camera with trans, since we dont get updated by a service here
-    camera.update(&GlobalTransform::from(Transform {
-        translation: vec3(0.0, 40.0, 100.0),
-        rotation: Quat::from_axis_angle(Vec3::X, -PI / 6.0),
-        ..Default::default()
-    }));
-
+pub fn render_camera(tlas: &Tlas, camera: &BvhCamera) -> ImageBuffer<Rgb<u8>, Vec<u8>> {
     let mut img = RgbImage::new(camera.width, camera.height);
     // TODO: this tiling doesnt work all resolutions, but its faster, so leaving it in for now
     let grid_edge_divisions: u32 = camera.width / 8;
@@ -55,7 +94,7 @@ pub fn random_scene(image_size: u32, groups: u32, tri_per_group: u32, save: bool
                     // PERF: calculating an offset 2 loops up is slower than doing it in the inter loop
                     let x = (grid_x * camera.width / grid_edge_divisions) + u;
                     let y = (grid_y * camera.height / grid_edge_divisions) + v;
-                    let mut ray = camera.get_ray(
+                    let ray = camera.get_ray(
                         x as f32 / camera.width as f32,
                         // TODO: image still reversed
                         y as f32 / camera.height as f32,
@@ -71,22 +110,12 @@ pub fn random_scene(image_size: u32, groups: u32, tri_per_group: u32, save: bool
             }
         }
     }
-
-    if save {
-        img.save(format!(
-            "tmp/bench_{}tris_{}.png",
-            groups * tri_per_group,
-            image_size
-        ))
-        .unwrap();
-    }
-
-    black_box(img);
+    img
 }
 
 pub fn build_random_tri_scene(group_count: u32, tri_per_group: u32) -> Tlas {
-    fn random_vec3(rng: &mut impl Rng) -> Vec3 {
-        vec3(
+    fn random_vec3(rng: &mut impl Rng) -> Vec3A {
+        vec3a(
             rng.random_range(-1.0..=1.0),
             rng.random_range(-1.0..=1.0),
             rng.random_range(-1.0..=1.0),

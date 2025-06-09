@@ -2,12 +2,15 @@
 // generates a image based on ray tracing a random triangle scene
 
 mod helpers;
+#[cfg(feature = "trace")]
+use bevy::log::info_span;
 use rand::prelude::*;
 use rand_chacha::{rand_core::SeedableRng, ChaChaRng};
 
 use std::{f32::consts::PI, time::Instant};
 use bevy::{
-    ecs::entity::Entity, math::{vec3, Quat, Vec3}, prelude::GlobalTransform, transform::components::Transform, utils::default
+    
+    ecs::entity::Entity, math::{vec3, vec3a, Quat, Vec3, Vec3A}, prelude::GlobalTransform, transform::components::Transform, utils::default
 };
 use raven_bvh::prelude::*;
 use image::{Rgb, RgbImage};
@@ -16,8 +19,6 @@ fn main() {
     
     println!("BvhNode size: {}", std::mem::size_of::<BvhNode>());
     println!("TlasNode size: {}", std::mem::size_of::<TlasNode>());
-    println!("Ray size: {}", std::mem::size_of::<Ray>());
-
     
     let build_time = Instant::now();
     let tlas = build_random_tri_scene();
@@ -31,16 +32,16 @@ fn main() {
 
         let mut camera = BvhCamera::new(size, size);
         // Bench: update camera with trans, since we dont get updated by a service here
-        camera.update(&GlobalTransform::from(Transform {
+        camera.update(&Transform {
             translation: vec3(0.0, 40.0, 100.0),
             rotation: Quat::from_axis_angle(Vec3::X, -PI / 6.0),
             ..Default::default()
-        }));
+        });
 
         let mut img = RgbImage::new(camera.width, camera.height);
         for y in 0..camera.height {
             for x in 0..camera.width {
-                let mut ray = camera.get_ray(
+                let ray = camera.get_ray(
                     x as f32 / camera.width as f32,                    
                     y as f32 / camera.height as f32,
                 );
@@ -67,8 +68,8 @@ pub fn build_random_tri_scene() -> Tlas {
     #[cfg(feature = "trace")]
     let _span = info_span!("build_random_tri_scene").entered();
 
-    fn random_vec3(rng: &mut impl Rng) -> Vec3 {
-        vec3(
+    fn random_vec3(rng: &mut impl Rng) -> Vec3A {
+        vec3a(
             rng.random_range(-1.0..=1.0),
             rng.random_range(-1.0..=1.0),
             rng.random_range(-1.0..=1.0),

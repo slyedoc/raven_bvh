@@ -3,12 +3,12 @@ extern crate test;
 
 use bevy::{math::vec3, prelude::*, transform::TransformSystem};
 
+mod util;
 mod aabb;
 mod bvh;
 use bvh::*;
 #[cfg(feature = "camera")]
 mod camera;
-mod ray;
 mod tlas;
 use tlas::*;
 mod tri;
@@ -18,7 +18,7 @@ pub mod prelude {
     #[cfg(feature = "camera")]
     pub use crate::camera::*;
     pub use crate::{
-        BvhMesh, BvhPlugin, BvhScene, BvhSystems, bvh::*, ray::*, tlas::*, tri::*,
+        BvhMesh, BvhPlugin, BvhScene, BvhSystems, bvh::*, tlas::*, tri::*, util::*
     };
 }
 
@@ -146,9 +146,9 @@ pub fn parse_mesh(mesh: &Mesh) -> Vec<Tri> {
                 let v1 = verts[tri_indexes[1] as usize];
                 let v2 = verts[tri_indexes[2] as usize];
                 triangles.push(Tri::new(
-                    vec3(v0[0], v0[1], v0[2]),
-                    vec3(v1[0], v1[1], v1[2]),
-                    vec3(v2[0], v2[1], v2[2]),
+                    vec3a(v0[0], v0[1], v0[2]),
+                    vec3a(v1[0], v1[1], v1[2]),
+                    vec3a(v2[0], v2[1], v2[2]),
                 ));
             }
             triangles

@@ -4,14 +4,14 @@ use bevy::prelude::*;
 //, stop gap to get things working
 #[derive(Default, Debug, Copy, Clone)]
 pub struct Tri {
-    pub vertex0: Vec3,
-    pub vertex1: Vec3,
-    pub vertex2: Vec3,
-    pub centroid: Vec3,
+    pub vertex0: Vec3A,
+    pub vertex1: Vec3A,
+    pub vertex2: Vec3A,
+    pub centroid: Vec3A,
 }
 
 impl Tri {
-    pub fn new(v0: Vec3, v1: Vec3, v2: Vec3) -> Self {
+    pub fn new(v0: Vec3A, v1: Vec3A, v2: Vec3A) -> Self {
         Tri {
             vertex0: v0,
             vertex1: v1,
