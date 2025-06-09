@@ -176,7 +176,7 @@ impl TlasIntersect for RayCast3d {
                         self.intersect_triangle(&bvh.tris[tri_index], tri_index, entity)
                     {
                         if let Some(best) = best_hit {
-                            if best.distance < hit.distance {
+                            if hit.distance < best.distance  {
                                 best_hit = Some(hit);
                             }
                         } else {
@@ -250,7 +250,7 @@ impl TlasIntersect for RayCast3d {
                     ray.intersect_bvh_instance(&tlas.blas[node.blas as usize], &tlas.bvhs)
                 {
                     if let Some(best) = best_hit {
-                        if best.distance < hit.distance {
+                        if hit.distance < best.distance{
                             best_hit = Some(hit);
                             ray.max = hit.distance; // tighten the ray
                         }
