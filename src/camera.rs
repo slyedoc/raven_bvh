@@ -1,4 +1,4 @@
-use crate::util::{RayCastExt};
+
 use crate::{BvhSystems};
 
 use crate::tlas::{Tlas, TlasCast};
@@ -21,7 +21,7 @@ impl Plugin for BvhCameraPlugin {
                 init_camera_image,
                 update_camera,
                 render_camera,
-                display_camera,
+                camera_ui,
             )
                 .chain()
                 .in_set(BvhSystems::Camera)
@@ -176,7 +176,7 @@ pub fn render_camera(
 }
 
 
-pub fn display_camera(mut commands: Commands, camera: Query<&BvhCamera, Added<BvhCamera>>) {
+pub fn camera_ui(mut commands: Commands, camera: Query<&BvhCamera, Added<BvhCamera>>) {
     for camera in camera.iter() {
         if let Some(image) = &camera.image {
             commands.spawn((

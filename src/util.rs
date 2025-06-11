@@ -1,13 +1,10 @@
 use crate::{
-    bvh::{Bvh, MeshBvh},
-    tlas::{BvhInstance, TNType, Tlas, TlasNode},
+    bvh::Bvh,
     tri::Tri,
 };
 use bevy::{
-    ecs::system::{SystemParam, lifetimeless::Read},
     math::bounding::RayCast3d,
     prelude::*,
-    ui::NodeType,
 };
 use std::mem::swap;
 

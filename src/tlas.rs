@@ -1,4 +1,4 @@
-use std::{f32::consts::E, mem::swap};
+use std::mem::swap;
 
 use bevy::{
     ecs::system::{lifetimeless::Read, SystemParam}, math::bounding::{Aabb3d, BoundingVolume, RayCast3d}, prelude::*

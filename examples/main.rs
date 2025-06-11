@@ -51,21 +51,40 @@ fn setup(
         })),
         SpawnMeshBvh, // This Marker will have our mesh added
     ));
+    commands.spawn((
+        Name::new("Box"),
+        Transform::from_xyz(0., 1., 0.),
+        Mesh3d(meshes.add(Cuboid::new(1.0, 1.0, 1.0).mesh())),
+        MeshMaterial3d(materials.add(StandardMaterial {
+            base_color: tailwind::GRAY_700.into(),
+            ..default()
+        })),
+        SpawnMeshBvh,
+    ));
 
-    let mesh_complexity = 3;
-    for (i, &(position, size, complexity, color)) in [
-        (vec3(-3.0, 1.0, 0.0), 2.0, 12, tailwind::YELLOW_400),
-        (vec3(3.0, 1.0, 0.0), 2.0, 12, tailwind::BLUE_400),
-    ].iter().enumerate() {
-        commands.spawn((
-            Name::new(format!("Target{}", i)),
-            Transform::from_translation(position),
-            Mesh3d(meshes.add(Sphere { radius: size }.mesh())),
-            MeshMaterial3d(materials.add(StandardMaterial {
-                base_color: color.into(),
-                ..default()
-            })),
-            SpawnMeshBvh,
-        ));
+    // Spawn a circle of targets
+    for i in 0..100 {
+        let angle = i as f32 * (2.0 * PI / 10.0);
+        let distance = 10.0 + (i as f32 * 0.7);
+        let position = vec3(angle.cos() * distance, 1.0, angle.sin() * distance);
+        commands.spawn(spawn_circle(i, position, &mut meshes, &mut materials));
     }
+}
+
+fn spawn_circle(
+    i: usize,
+    pos: Vec3,
+    meshes: &mut ResMut<Assets<Mesh>>,
+    materials: &mut ResMut<Assets<StandardMaterial>>,
+) -> impl Bundle {
+    ((
+        Name::new(format!("Target{}", i)),
+        Transform::from_translation(pos),
+        Mesh3d(meshes.add(Sphere { radius: 2.0 }.mesh())),
+        MeshMaterial3d(materials.add(StandardMaterial {
+            base_color: tailwind::AMBER_400.into(),
+            ..default()
+        })),
+        SpawnMeshBvh,
+    ))
 }

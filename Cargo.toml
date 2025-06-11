@@ -33,6 +33,7 @@ inherits = "dev"
 
 [features]
 default = []
+debug_draw = []
 camera = []
 trace = []
 save = [] # to test benchmark output
@@ -66,7 +67,7 @@ required-features = ["camera"]
 harness = true
 
 [[bench]]
-name = "bevy"
+name = "common"
 required-features = ["camera"]
 harness = true
 

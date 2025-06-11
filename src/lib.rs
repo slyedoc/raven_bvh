@@ -2,10 +2,8 @@
 extern crate test;
 
 use bevy::{
-    math::bounding::{Aabb3d, BoundingVolume},
+    math::bounding::BoundingVolume,
     prelude::*,
-    render::{primitives::Aabb, view::VisibilitySystems},
-    transform::TransformSystem,
 };
 
 mod aabb;
@@ -16,15 +14,19 @@ use bvh::*;
 mod camera;
 mod tlas;
 use tlas::*;
+mod debug;
 
-use crate::aabb::Aabb3dExt;
+use crate::{
+    debug::{BvhDebug},
+};
 mod tri;
 
 pub mod prelude {
     #[cfg(feature = "camera")]
     pub use crate::camera::*;
     pub use crate::{
-        BvhPlugin, BvhSystems, SpawnMeshBvh, SpawnSceneBvhs, bvh::*, tlas::*, tri::*, util::*,
+        BvhPlugin, BvhSystems, SpawnMeshBvh, SpawnSceneBvhs, bvh::*, debug::*, tlas::*, tri::*,
+        util::*,
     };
 }
 
@@ -33,7 +35,7 @@ const BIN_COUNT: usize = 8;
 #[derive(Debug, Clone, PartialEq, Eq, Hash, SystemSet)]
 pub enum BvhSystems {
     Update,
-    #[cfg(feature = "camera")]
+    //#[cfg(feature = "camera")]
     Camera,
 }
 
@@ -42,12 +44,13 @@ pub struct BvhPlugin;
 impl Plugin for BvhPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<Tlas>()
+            .init_resource::<BvhDebug>()
             .init_asset::<Bvh>()
             .configure_sets(
                 PostUpdate,
                 (BvhSystems::Update, BvhSystems::Camera)
                     .chain()
-                    .after(VisibilitySystems::MarkNewlyHiddenEntitiesInvisible),
+                    .after(TransformSystem::TransformPropagate)                    
             )
             .add_systems(
                 PostUpdate,
@@ -55,6 +58,9 @@ impl Plugin for BvhPlugin {
                     .chain()
                     .in_set(BvhSystems::Update),
             );
+
+        #[cfg(feature = "debug_draw")]
+        app.add_systems(PostUpdate, debug::debug_gimos.after(BvhSystems::Update));
 
         #[cfg(feature = "camera")]
         app.add_plugins(camera::BvhCameraPlugin);
@@ -114,43 +120,50 @@ fn spawn_scene_bvhs(
     }
 }
 
-pub fn build_tlas(mut tlas: ResMut<Tlas>, query: Query<(Entity, Option<&Name>, &MeshBvh, &GlobalTransform)>,
+pub fn build_tlas(
+    mut tlas: ResMut<Tlas>,
+    query: Query<(Entity, &MeshBvh, &GlobalTransform)>,
     bvhs: Res<Assets<Bvh>>,
+    //#[cfg(feature = "debug_draw")] mut gizmos: Gizmos,
 ) {
+    let count = query.iter().count();
+    let mut node_index = vec![0u32; count + 1];
+    let mut node_indices = count as i32;
+
     tlas.tlas_nodes.clear();
 
     // reserve a root node
     tlas.tlas_nodes.push(TlasNode::default());
 
     // fill the tlas all the leaf nodes
-    for (e, name, b, global_trans) in query.iter() {
-        
+    for (i, (e, b, global_trans)) in query.iter().enumerate() {
         let bvh = bvhs.get(&b.0).expect("Bvh not found");
+        
+        let aabb = bvh.nodes[0]
+            .aabb
+            .clone()
+            .transformed_by(global_trans.translation(), global_trans.rotation());
+        //let inv_trans = global_trans.affine().inverse();
+        // calculate world-space aabb using global transform
+        //let mut aabb = Aabb3d::init();
+        // for i in 0..8 {
+        //     let corner = vec3a(
+        //         if i & 1 != 0 { local_aabb.max.x } else { local_aabb.min.x },
+        //         if i & 2 != 0 { local_aabb.max.y } else { local_aabb.min.y },
+        //         if i & 4 != 0 { local_aabb.max.z } else { local_aabb.min.z },
+        //     );
+        //     let world_corner = global_trans.affine().transform_point3a(corner);
+        //     aabb.expand(world_corner);
+        // }
+        //#[cfg(feature = "debug_draw")]
+        //gizmos.cuboid(aabb3d_global(&aabb), tailwind::GREEN_500);
 
-        // transform the AABB to world space
-        let inv_trans = global_trans.affine().inverse();
-
-        // calculate world-space bounds using the new matrix
-        let mut aabb = bvh.nodes[0].aabb.clone();        
-        for i in 0..8 {
-            aabb.expand(inv_trans.transform_point3a(vec3a(
-                if i & 1 != 0 { aabb.max.x } else { aabb.min.x },
-                if i & 2 != 0 { aabb.max.y } else { aabb.min.y },
-                if i & 4 != 0 { aabb.max.z } else { aabb.min.z },
-            )));
-        }
-
-        println!("Adding TLAS node: {:?} - {:?}", name, aabb);
-        tlas.tlas_nodes.push(TlasNode {            
+        node_index[i] = i as u32 + 1;
+        tlas.tlas_nodes.push(TlasNode {
             aabb,
             node_type: TNType::Leaf(e),
         });
     }
-
-    let count = query.iter().count();
-    dbg!(tlas.tlas_nodes.len(), &count);
-    let mut node_index = vec![0u32; count + 1];
-    let mut node_indices = count as i32;
 
     // use agglomerative clustering to build the TLAS
     let mut a = 0i32;

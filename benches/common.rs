@@ -1,6 +1,4 @@
-use bevy::{
-    color::palettes::tailwind, pbr::PbrPlugin, prelude::*, render::{mesh::MeshPlugin, RenderPlugin}
-};
+use bevy::{color::palettes::tailwind, prelude::*, render::mesh::MeshPlugin};
 use raven_bvh::prelude::*;
 
 #[test]
@@ -10,8 +8,9 @@ fn camera() {
 
     app.add_plugins((
         MinimalPlugins,
+        TransformPlugin,
         AssetPlugin::default(),
-        ImagePlugin::default(),        
+        ImagePlugin::default(),
         MeshPlugin,
         //AssetPlugin::default(),
         BvhPlugin,
@@ -27,33 +26,36 @@ fn camera() {
                 hdr: true,
                 ..default()
             },
-            Transform::from_xyz(0.0, 2.0, 5.0).looking_at(Vec3::ZERO, Vec3::Y),
+            Transform::from_xyz(0.0, 2.0, 10.0).looking_at(Vec3::ZERO, Vec3::Y),
             BvhCamera::new(256, 256),
         ))
         .id();
 
     // Run systems
     app.update();
+    app.update();
 
     // Check resulting changes
     let image = {
-        let handle = app.world()
-            .get::<BvhCamera>(camera_id).expect("Camera image not found")
-            .image.clone().expect("Image not found");
+        let handle = app
+            .world()
+            .get::<BvhCamera>(camera_id)
+            .expect("Camera image not found")
+            .image
+            .clone()
+            .expect("Image not found");
         app.world()
             .resource::<Assets<Image>>()
             .get(&handle)
             .expect("Camera image asset not found")
             .clone()
+            .try_into_dynamic()
+            .expect("Failed to convert image to dynamic")
     };
+    let file_path = "tmp/bevy.png";
+    image.save(file_path).unwrap();
+    println!("Camera image saved to: {}", file_path);
 
-    let dyn_image = image
-        .try_into_dynamic()
-        .expect("Failed to convert image to dynamic");
-     dyn_image.save(format!("tmp/bevy.png"))
-    .unwrap();
-
-    
     //assert_eq!(app.world().get::<Enemy>(enemy_id).unwrap().hit_points, 4);
 }
 
@@ -80,7 +82,18 @@ fn setup(
         SpawnMeshBvh, // This Marker will have our mesh added
     ));
 
-    for (position, size, color) in [
+    //     commands.spawn((
+    //     Name::new("Box"),
+    //     Transform::from_xyz(1., 1., 0.),
+    //     Mesh3d(meshes.add(Cuboid::new(1.0, 1.0, 1.0).mesh())),
+    //     // MeshMaterial3d(materials.add(StandardMaterial {
+    //     //     base_color: tailwind::GRAY_700.into(),
+    //     //     ..default()
+    //     // })),
+    //     SpawnMeshBvh,
+    // ));
+
+    for (position, size, _color) in [
         (vec3(-3.0, 1.0, 0.0), 2.0, tailwind::YELLOW_400),
         (vec3(3.0, 1.0, 0.0), 2.0, tailwind::BLUE_400),
     ] {
@@ -88,10 +101,6 @@ fn setup(
             Name::new("Target"),
             Transform::from_translation(position),
             Mesh3d(meshes.add(Sphere { radius: size }.mesh())),
-            // MeshMaterial3d(materials.add(StandardMaterial {
-            //     base_color: color.into(),
-            //     ..default()
-            // })),
             SpawnMeshBvh,
         ));
     }
