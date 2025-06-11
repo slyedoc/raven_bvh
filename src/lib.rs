@@ -1,24 +1,30 @@
 #![feature(test)]
 extern crate test;
 
-use bevy::{math::vec3, prelude::*, transform::TransformSystem};
+use bevy::{
+    math::bounding::{Aabb3d, BoundingVolume},
+    prelude::*,
+    render::{primitives::Aabb, view::VisibilitySystems},
+    transform::TransformSystem,
+};
 
-mod util;
 mod aabb;
 mod bvh;
+mod util;
 use bvh::*;
 #[cfg(feature = "camera")]
 mod camera;
 mod tlas;
 use tlas::*;
+
+use crate::aabb::Aabb3dExt;
 mod tri;
-use tri::*;
 
 pub mod prelude {
     #[cfg(feature = "camera")]
     pub use crate::camera::*;
     pub use crate::{
-        BvhMesh, BvhPlugin, BvhScene, BvhSystems, bvh::*, tlas::*, tri::*, util::*
+        BvhPlugin, BvhSystems, SpawnMeshBvh, SpawnSceneBvhs, bvh::*, tlas::*, tri::*, util::*,
     };
 }
 
@@ -35,41 +41,52 @@ pub struct BvhPlugin;
 
 impl Plugin for BvhPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<Tlas>().add_systems(
-            PostUpdate,
-            (spawn_bvh_mesh, spawn_bvh_scene, update_bvh, update_tlas)
-                .chain()
-                .in_set(BvhSystems::Update)
-                .after(TransformSystem::TransformPropagate),
-        );
+        app.init_resource::<Tlas>()
+            .init_asset::<Bvh>()
+            .configure_sets(
+                PostUpdate,
+                (BvhSystems::Update, BvhSystems::Camera)
+                    .chain()
+                    .after(VisibilitySystems::MarkNewlyHiddenEntitiesInvisible),
+            )
+            .add_systems(
+                PostUpdate,
+                (spawn_mesh_bvh, spawn_scene_bvhs, build_tlas)
+                    .chain()
+                    .in_set(BvhSystems::Update),
+            );
 
         #[cfg(feature = "camera")]
         app.add_plugins(camera::BvhCameraPlugin);
     }
 }
 
-fn spawn_bvh_mesh(
+/// Helper to add BVH from a Mesh3d component with a marker component
+fn spawn_mesh_bvh(
     mut commands: Commands,
     meshes: Res<Assets<Mesh>>,
-    query: Query<(Entity, &Mesh3d), With<BvhMesh>>,
-    mut tlas: ResMut<Tlas>,
+    mut bvhs: ResMut<Assets<Bvh>>,
+    query: Query<(Entity, &Mesh3d), With<SpawnMeshBvh>>,
 ) {
     for (e, handle) in query.iter() {
         let mesh = meshes.get(handle).expect("Mesh not found");
-        let tris = parse_mesh(mesh);
-        let bvh_index = tlas.add_bvh(Bvh::new(tris));
-        tlas.add_instance(BvhInstance::new(e, bvh_index));
-        commands.entity(e).remove::<BvhMesh>();
+        let bvh = bvhs.add(Bvh::from(mesh));
+        commands
+            .entity(e)
+            .insert(MeshBvh(bvh))
+            .remove::<SpawnMeshBvh>();
     }
 }
 
-fn spawn_bvh_scene(
+/// Helper to MeshBvh to any Mesh3d in a SceneRoot component with a marker component
+fn spawn_scene_bvhs(
     mut commands: Commands,
     meshes: Res<Assets<Mesh>>,
-    query: Query<(Entity, &SceneRoot), With<BvhScene>>,
+    mut bvhs: ResMut<Assets<Bvh>>,
+    query: Query<(Entity, &SceneRoot), With<SpawnSceneBvhs>>,
     children: Query<(Entity, Option<&Children>, Option<&Mesh3d>)>,
     server: Res<AssetServer>,
-    mut tlas: ResMut<Tlas>,
+    mut stack: Local<Vec<Entity>>,
 ) {
     for (root, scene) in query.iter() {
         if let Some(load_state) = server.get_load_state(scene.0.id()) {
@@ -78,7 +95,7 @@ fn spawn_bvh_scene(
             }
         }
 
-        let mut stack = vec![root];
+        stack.push(root);
         while let Some(e) = stack.pop() {
             let (e, opt_children, opt_mesh) = children.get(e).unwrap();
             if let Some(children) = opt_children {
@@ -88,71 +105,86 @@ fn spawn_bvh_scene(
             }
             if let Some(h_mesh) = opt_mesh {
                 let mesh = meshes.get(h_mesh).expect("Mesh not found");
-                let tris = parse_mesh(mesh);
-                let bvh_index = tlas.add_bvh(Bvh::new(tris));
-                tlas.add_instance(BvhInstance::new(e, bvh_index));
+                let bvh = bvhs.add(Bvh::from(mesh));
+                commands.entity(e).insert(MeshBvh(bvh));
             }
         }
 
-        commands.entity(root).remove::<BvhScene>();
+        commands.entity(root).remove::<SpawnSceneBvhs>();
     }
 }
 
-// TODO: both of these update system are incomplete, for now we are rebuilding every frame
-// for now working on speeding up ray intersection
-// will come back to this
-pub fn update_bvh(query: Query<&GlobalTransform>, mut tlas: ResMut<Tlas>) {
-    // moved fn into tlas self to since it needed 2 mutable refs within the tlas
-    tlas.update_bvh_instances(&query);
-}
+pub fn build_tlas(mut tlas: ResMut<Tlas>, query: Query<(Entity, Option<&Name>, &MeshBvh, &GlobalTransform)>,
+    bvhs: Res<Assets<Bvh>>,
+) {
+    tlas.tlas_nodes.clear();
 
-pub fn update_tlas(mut tlas: ResMut<Tlas>) {
-    tlas.build();
+    // reserve a root node
+    tlas.tlas_nodes.push(TlasNode::default());
+
+    // fill the tlas all the leaf nodes
+    for (e, name, b, global_trans) in query.iter() {
+        
+        let bvh = bvhs.get(&b.0).expect("Bvh not found");
+
+        // transform the AABB to world space
+        let inv_trans = global_trans.affine().inverse();
+
+        // calculate world-space bounds using the new matrix
+        let mut aabb = bvh.nodes[0].aabb.clone();        
+        for i in 0..8 {
+            aabb.expand(inv_trans.transform_point3a(vec3a(
+                if i & 1 != 0 { aabb.max.x } else { aabb.min.x },
+                if i & 2 != 0 { aabb.max.y } else { aabb.min.y },
+                if i & 4 != 0 { aabb.max.z } else { aabb.min.z },
+            )));
+        }
+
+        println!("Adding TLAS node: {:?} - {:?}", name, aabb);
+        tlas.tlas_nodes.push(TlasNode {            
+            aabb,
+            node_type: TNType::Leaf(e),
+        });
+    }
+
+    let count = query.iter().count();
+    dbg!(tlas.tlas_nodes.len(), &count);
+    let mut node_index = vec![0u32; count + 1];
+    let mut node_indices = count as i32;
+
+    // use agglomerative clustering to build the TLAS
+    let mut a = 0i32;
+    let mut b = tlas.find_best_match(&node_index, node_indices, a);
+    while node_indices > 1 {
+        let c = tlas.find_best_match(&node_index, node_indices, b);
+        if a == c {
+            let node_index_a = node_index[a as usize];
+            let node_index_b = node_index[b as usize];
+            let node_a = tlas.tlas_nodes[node_index_a as usize];
+            let node_b = tlas.tlas_nodes[node_index_b as usize];
+            tlas.tlas_nodes.push(TlasNode {
+                aabb: node_a.aabb.merge(&node_b.aabb),
+                node_type: TNType::Branch {
+                    left_right: node_index_a + (node_index_b << 16),
+                },
+            });
+            node_index[a as usize] = tlas.tlas_nodes.len() as u32 - 1;
+            node_index[b as usize] = node_index[node_indices as usize - 1];
+            node_indices -= 1;
+            b = tlas.find_best_match(&node_index, node_indices, a);
+        } else {
+            a = b;
+            b = c;
+        }
+    }
+    tlas.tlas_nodes[0] = tlas.tlas_nodes[node_index[a as usize] as usize];
 }
 
 // Added to Entity with Mesh3d to enable parsing once mesh is loaded, will be removed after parsing
 #[derive(Component)]
-pub struct BvhMesh;
+pub struct SpawnMeshBvh;
 #[derive(Component)]
 
 /// Added to SceneRoot to enable parsing scene once loaded, will be removed after parsing
 #[require(SceneRoot)]
-pub struct BvhScene;
-
-// TODO: We dont really want to copy the all tris, find better way
-pub fn parse_mesh(mesh: &Mesh) -> Vec<Tri> {
-    use bevy::render::mesh::Indices;
-    match mesh.primitive_topology() {
-        bevy::render::mesh::PrimitiveTopology::TriangleList => {
-            let indexes = match mesh.indices().expect("Mesh should have Indices") {
-                Indices::U32(vec) => vec,
-                Indices::U16(vec) => &vec.iter().map(|i| *i as u32).collect::<Vec<_>>(),
-            };
-
-            let verts = match mesh
-                .attribute(Mesh::ATTRIBUTE_POSITION)
-                .expect("Mesh should have Position Attribute")
-            {
-                bevy::render::mesh::VertexAttributeValues::Float32x3(vec) => {
-                    vec.iter().map(|vec| vec3(vec[0], vec[1], vec[2]))
-                }
-                _ => todo!(),
-            }
-            .collect::<Vec<_>>();
-
-            let mut triangles = Vec::with_capacity(indexes.len() / 3);
-            for tri_indexes in indexes.chunks(3) {
-                let v0 = verts[tri_indexes[0] as usize];
-                let v1 = verts[tri_indexes[1] as usize];
-                let v2 = verts[tri_indexes[2] as usize];
-                triangles.push(Tri::new(
-                    vec3a(v0[0], v0[1], v0[2]),
-                    vec3a(v1[0], v1[1], v1[2]),
-                    vec3a(v2[0], v2[1], v2[2]),
-                ));
-            }
-            triangles
-        }
-        _ => todo!(),
-    }
-}
+pub struct SpawnSceneBvhs;

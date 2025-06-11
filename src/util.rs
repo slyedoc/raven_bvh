@@ -1,11 +1,13 @@
 use crate::{
-    bvh::{Bvh, BvhInstance},
-    tlas::{Tlas, TlasNode},
+    bvh::{Bvh, MeshBvh},
+    tlas::{BvhInstance, TNType, Tlas, TlasNode},
     tri::Tri,
 };
 use bevy::{
-    math::bounding::{Aabb3d, RayCast3d},
+    ecs::system::{SystemParam, lifetimeless::Read},
+    math::bounding::RayCast3d,
     prelude::*,
+    ui::NodeType,
 };
 use std::mem::swap;
 
@@ -58,19 +60,17 @@ impl RayCast3dToSpace for RayCast3d {
     }
 }
 
-pub trait TlasIntersect {
+pub trait RayCastExt {
     fn intersect_triangle(&self, tri: &Tri, tri_index: usize, entity: Entity) -> Option<Hit>;
 
-    fn intersect_tlas(&self, tlas: &Tlas) -> Option<Hit>;
-
-    fn intersect_aabb(&self, aabb: &Aabb3d) -> f32;
+    //fn intersect_tlas(&self, tlas: &Tlas) -> Option<Hit>;
 
     fn intersect_bvh(&self, bvh: &Bvh, entity: Entity) -> Option<Hit>;
 
-    fn intersect_bvh_instance(&self, bvh_instance: &BvhInstance, bvhs: &[Bvh]) -> Option<Hit>;
+    // fn intersect_bvh_instance(&self, bvh_instance: &BvhInstance, bvhs: &[Bvh]) -> Option<Hit>;
 }
 
-impl TlasIntersect for RayCast3d {
+impl RayCastExt for RayCast3d {
     #[inline(always)]
     fn intersect_triangle(&self, tri: &Tri, tri_index: usize, entity: Entity) -> Option<Hit> {
         #[cfg(feature = "trace")]
@@ -129,58 +129,32 @@ impl TlasIntersect for RayCast3d {
         None
     }
 
-    #[inline(always)]
-    fn intersect_aabb(&self, aabb: &Aabb3d) -> f32 {
-        #[cfg(feature = "trace")]
-        let _span = info_span!("intersect_aabb").entered();
-        let direction_inv = self.direction_recip();
-        let tx1 = (aabb.min.x - self.origin.x) * direction_inv.x;
-        let tx2 = (aabb.max.x - self.origin.x) * direction_inv.x;
-        let tmin = tx1.min(tx2);
-        let tmax = tx1.max(tx2);
-        let ty1 = (aabb.min.y - self.origin.y) * direction_inv.y;
-        let ty2 = (aabb.max.y - self.origin.y) * direction_inv.y;
-        let tmin = tmin.max(ty1.min(ty2));
-        let tmax = tmax.min(ty1.max(ty2));
-        let tz1 = (aabb.min.z - self.origin.z) * direction_inv.z;
-        let tz2 = (aabb.max.z - self.origin.z) * direction_inv.z;
-        let tmin = tmin.max(tz1.min(tz2));
-        let tmax = tmax.min(tz1.max(tz2));
-
-        // Most intersect test would return here with a tmax and min test
-        // but we are also sorting
-        // let t_hit = if let Some(hit) = self.hit {
-        //     hit.distance
-        // } else {
-        //     1e30f32
-        // };
-
-        if tmax >= tmin && tmin < self.max && tmax > 0.0 {
-            tmin
-        } else {
-            1e30f32
-        }
-    }
-
     fn intersect_bvh(&self, bvh: &Bvh, entity: Entity) -> Option<Hit> {
         #[cfg(feature = "trace")]
         let _span = info_span!("intersect_bvh").entered();
         let mut node = &bvh.nodes[0];
         let mut stack = Vec::with_capacity(64);
         let mut best_hit: Option<Hit> = None;
+
+        // PERF: clone the ray so we can update max distance as we find hits to tighten our search,
+        // more complex the scene the big the performance win
+        let mut ray = self.clone();
+
         loop {
             if node.is_leaf() {
                 for i in 0..node.tri_count {
                     let tri_index = bvh.triangle_indexs[(node.left_first + i) as usize];
                     if let Some(hit) =
-                        self.intersect_triangle(&bvh.tris[tri_index], tri_index, entity)
+                        ray.intersect_triangle(&bvh.tris[tri_index], tri_index, entity)
                     {
                         if let Some(best) = best_hit {
-                            if hit.distance < best.distance  {
+                            if hit.distance < best.distance {
                                 best_hit = Some(hit);
+                                ray.max = hit.distance; // tighten the ray
                             }
                         } else {
                             best_hit = Some(hit);
+                            ray.max = hit.distance; // tighten the ray
                         }
                     }
                 }
@@ -193,8 +167,8 @@ impl TlasIntersect for RayCast3d {
             let mut child1 = &bvh.nodes[node.left_first as usize];
             let mut child2 = &bvh.nodes[(node.left_first + 1) as usize];
 
-            let mut dist1 = self.aabb_intersection_at(&child1.aabb);
-            let mut dist2 = self.aabb_intersection_at(&child2.aabb);
+            let mut dist1 = ray.aabb_intersection_at(&child1.aabb);
+            let mut dist2 = ray.aabb_intersection_at(&child2.aabb);
 
             // Sort the children by distance
             if dist1.unwrap_or(f32::MAX) > dist2.unwrap_or(f32::MAX) {
@@ -215,78 +189,63 @@ impl TlasIntersect for RayCast3d {
             }
         }
         best_hit
-    }
+    }    
 
-    fn intersect_bvh_instance(&self, bvh_instance: &BvhInstance, bvhs: &[Bvh]) -> Option<Hit> {
-        #[cfg(feature = "trace")]
-        let _span = info_span!("intersect_bvh_instance").entered();
+    // fn intersect_tlas(&self, tlas: &Tlas) -> Option<Hit> {
+    //     // PERF: clone the ray so we can update max distance as we find hits to tighten our search,
+    //     // more complex the scene the bigger the performance win
+    //     let mut ray = self.clone();
 
-        let world_to = bvh_instance.inv_trans;
-        let ray = RayCast3d::new(
-            world_to.transform_point3a(self.origin),
-            Dir3A::new_unchecked(world_to.transform_vector3a(self.direction.as_vec3a())),
-            self.max,
-        );
+    //     if tlas.tlas_nodes.is_empty() || tlas.blas.is_empty() {
+    //         return None;
+    //     }
+    //     let mut stack = Vec::<&TlasNode>::with_capacity(64);
+    //     let mut node = &tlas.tlas_nodes[0];
+    //     let mut best_hit: Option<Hit> = None;
 
-        let bvh = &bvhs[bvh_instance.bvh_index];
-        ray.intersect_bvh(bvh, bvh_instance.entity)
-    }
-
-    fn intersect_tlas(&self, tlas: &Tlas) -> Option<Hit> {
-        // clone the ray so we can update max distance as we find hits to tighten our search,
-        // more complex the scene the big the performance win
-        let mut ray = self.clone();
-
-        if tlas.tlas_nodes.is_empty() || tlas.blas.is_empty() {
-            return None;
-        }
-        let mut stack = Vec::<&TlasNode>::with_capacity(64);
-        let mut node = &tlas.tlas_nodes[0];
-        let mut best_hit: Option<Hit> = None;
-
-        loop {
-            if node.is_leaf() {
-                if let Some(hit) =
-                    ray.intersect_bvh_instance(&tlas.blas[node.blas as usize], &tlas.bvhs)
-                {
-                    if let Some(best) = best_hit {
-                        if hit.distance < best.distance{
-                            best_hit = Some(hit);
-                            ray.max = hit.distance; // tighten the ray
-                        }
-                    } else {
-                        best_hit = Some(hit);
-                        ray.max = hit.distance; // tighten the ray
-                    }
-                }
-                if stack.is_empty() {
-                    break;
-                } else {
-                    node = stack.pop().unwrap();
-                }
-                continue;
-            }
-            let mut child1 = &tlas.tlas_nodes[(node.left_right & 0xffff) as usize];
-            let mut child2 = &tlas.tlas_nodes[(node.left_right >> 16) as usize];
-            let mut dist1 = ray.aabb_intersection_at(&child1.aabb);
-            let mut dist2 = ray.aabb_intersection_at(&child2.aabb);
-            if dist1.unwrap_or(f32::MAX) > dist2.unwrap_or(f32::MAX) {
-                swap(&mut dist1, &mut dist2);
-                swap(&mut child1, &mut child2);
-            }
-            if dist1.is_none() {
-                if stack.is_empty() {
-                    break;
-                } else {
-                    node = stack.pop().unwrap();
-                }
-            } else {
-                node = child1;
-                if dist2.is_some() {
-                    stack.push(child2);
-                }
-            }
-        }
-        best_hit
-    }
+    //     loop {
+    //         if node.is_leaf() {
+    //             if let Some(hit) =
+    //                 ray.intersect_bvh_instance(&tlas.blas[node.blas as usize], &tlas.bvhs)
+    //             {
+    //                 if let Some(best) = best_hit {
+    //                     if hit.distance < best.distance {
+    //                         best_hit = Some(hit);
+    //                         ray.max = hit.distance; // tighten the ray
+    //                     }
+    //                 } else {
+    //                     best_hit = Some(hit);
+    //                     ray.max = hit.distance; // tighten the ray
+    //                 }
+    //             }
+    //             if stack.is_empty() {
+    //                 break;
+    //             } else {
+    //                 node = stack.pop().unwrap();
+    //             }
+    //             continue;
+    //         }
+    //         let mut child1 = &tlas.tlas_nodes[(node.left_right & 0xffff) as usize];
+    //         let mut child2 = &tlas.tlas_nodes[(node.left_right >> 16) as usize];
+    //         let mut dist1 = ray.aabb_intersection_at(&child1.aabb);
+    //         let mut dist2 = ray.aabb_intersection_at(&child2.aabb);
+    //         if dist1.unwrap_or(f32::MAX) > dist2.unwrap_or(f32::MAX) {
+    //             swap(&mut dist1, &mut dist2);
+    //             swap(&mut child1, &mut child2);
+    //         }
+    //         if dist1.is_none() {
+    //             if stack.is_empty() {
+    //                 break;
+    //             } else {
+    //                 node = stack.pop().unwrap();
+    //             }
+    //         } else {
+    //             node = child1;
+    //             if dist2.is_some() {
+    //                 stack.push(child2);
+    //             }
+    //         }
+    //     }
+    //     best_hit
+    // }
 }

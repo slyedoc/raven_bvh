@@ -1,7 +1,7 @@
-use crate::util::TlasIntersect;
+use crate::util::{RayCastExt};
 use crate::{BvhSystems};
 
-use crate::tlas::Tlas;
+use crate::tlas::{Tlas, TlasCast};
 use bevy::math::bounding::RayCast3d;
 use bevy::{
     asset::RenderAssetUsages,
@@ -132,7 +132,8 @@ pub fn update_camera(mut camera_query: Query<(&mut BvhCamera, &GlobalTransform)>
 pub fn render_camera(
     camera: Single<&BvhCamera>,
     mut images: ResMut<Assets<Image>>,
-    tlas: Res<Tlas>,
+    
+    tlas_cast: TlasCast,
 ) {
     if let Some(image) = &camera.image {
         let image = images.get_mut(image).unwrap();
@@ -157,7 +158,8 @@ pub fn render_camera(
                     //     v += rng.gen::<f32>() / camera.height as f32;
                     // }                    
                     let ray = camera.get_ray(u, 1.0 - v);
-                    let color = if let Some(hit) = ray.intersect_tlas(&tlas) {
+                    
+                    let color = if let Some(hit) = tlas_cast.intersect_tlas(&ray) {
                         vec3(hit.u, hit.v, 1.0 - (hit.u + hit.v)) * 255.0
                     } else {
                         Vec3::ZERO

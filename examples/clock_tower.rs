@@ -6,6 +6,9 @@ use raven_bvh::prelude::*;
 
 use crate::helpers::camera_free::CameraFree;
 
+// !!!!!!!!!!
+// TODO: This is broken, we dont scale distnce at some point
+
 // Example using BvhInitWithChildren for a scene load
 fn main() {
     App::new()
@@ -40,7 +43,7 @@ fn setup(
         Transform::from_rotation(Quat::from_euler(EulerRot::XYZ, -1.0, -0.5, 0.0)),
     ));
 
-    //ground
+    /// ground
     commands.spawn((
         Name::new("Ground"),
         Transform::from_xyz(0.0, 0.0, 0.0),
@@ -49,17 +52,20 @@ fn setup(
             base_color: tailwind::GREEN_900.into(),
             ..default()
         })),
-        BvhMesh, // This Marker will have our mesh added
+        SpawnMeshBvh, // This Marker will have our mesh added
     ));
 
+
+    /// This is to test when our Transform has odd scaling
     commands.spawn((
         Name::new("Clock Tower"),
-        Transform::from_xyz(0.0, 4.0, -10.0).with_scale(Vec3::splat(0.001)), // scale it down so we can see it
+        Transform::from_xyz(0.0, 4.0, -10.0)
+            .with_scale(Vec3::splat(0.001)), // scale it to miniture size
         SceneRoot(
             asset_server.load(GltfAssetLabel::Scene(0).from_asset("models/clock-tower/scene.glb")),
         ),
         // This marker tells the BVH system to build nested children
         // for this entity, the handle is used to wait till asset is loaded
-        BvhScene,
+        SpawnSceneBvhs,
     ));
 }

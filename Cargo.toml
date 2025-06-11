@@ -21,9 +21,6 @@ opt-level = 1
 [profile.dev.package."*"]
 opt-level = 3
 
-[profile.release]
-lto = "thin"
-
 [profile.wasm-dev]
 inherits = "dev"
 opt-level = 1
@@ -68,6 +65,10 @@ name = "random_scene"
 required-features = ["camera"]
 harness = true
 
+[[bench]]
+name = "bevy"
+required-features = ["camera"]
+harness = true
 
 [[example]]
 name = "main"
@@ -81,6 +82,3 @@ required-features = ["camera"]
 name = "clock_tower"
 required-features = ["camera"]
 
-[[example]]
-name = "minimal"
-required-features = ["camera"]

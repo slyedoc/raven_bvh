@@ -49,23 +49,23 @@ fn setup(
             base_color: tailwind::GREEN_900.into(),
             ..default()
         })),
-        BvhMesh, // This Marker will have our mesh added
+        SpawnMeshBvh, // This Marker will have our mesh added
     ));
 
     let mesh_complexity = 3;
-    for (position, size, complexity, color) in [
+    for (i, &(position, size, complexity, color)) in [
         (vec3(-3.0, 1.0, 0.0), 2.0, 12, tailwind::YELLOW_400),
         (vec3(3.0, 1.0, 0.0), 2.0, 12, tailwind::BLUE_400),
-    ] {
+    ].iter().enumerate() {
         commands.spawn((
-            Name::new("Target"),
+            Name::new(format!("Target{}", i)),
             Transform::from_translation(position),
             Mesh3d(meshes.add(Sphere { radius: size }.mesh())),
             MeshMaterial3d(materials.add(StandardMaterial {
                 base_color: color.into(),
                 ..default()
             })),
-            BvhMesh,
+            SpawnMeshBvh,
         ));
     }
 }

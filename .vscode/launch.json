@@ -7,128 +7,17 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug unit tests in library 'bevy_slyedoc_bvh'",
+            "name": "Debug unit tests in library 'raven_bvh'",
             "cargo": {
                 "args": [
                     "test",
                     "--no-run",
                     "--lib",
-                    "--package=bevy_slyedoc_bvh"
+                    "--package=raven_bvh"
                 ],
                 "filter": {
-                    "name": "bevy_slyedoc_bvh",
+                    "name": "raven_bvh",
                     "kind": "lib"
-                }
-            },
-            "args": [],
-            "cwd": "${workspaceFolder}"
-        },
-        {
-            "type": "lldb",
-            "request": "launch",
-            "name": "Debug example 'raytrace'",
-            "cargo": {
-                "args": [
-                    "build",
-                    "--example=raytrace",
-                    "--package=bevy_slyedoc_bvh"
-                ],
-                "filter": {
-                    "name": "raytrace",
-                    "kind": "example"
-                }
-            },
-            "args": [],
-            "cwd": "${workspaceFolder}"
-        },
-        {
-            "type": "lldb",
-            "request": "launch",
-            "name": "Debug unit tests in example 'raytrace'",
-            "cargo": {
-                "args": [
-                    "test",
-                    "--no-run",
-                    "--example=raytrace",
-                    "--package=bevy_slyedoc_bvh"
-                ],
-                "filter": {
-                    "name": "raytrace",
-                    "kind": "example"
-                }
-            },
-            "args": [],
-            "cwd": "${workspaceFolder}"
-        },
-        {
-            "type": "lldb",
-            "request": "launch",
-            "name": "Debug example 'sponza'",
-            "cargo": {
-                "args": [
-                    "build",
-                    "--example=sponza",
-                    "--package=bevy_slyedoc_bvh"
-                ],
-                "filter": {
-                    "name": "sponza",
-                    "kind": "example"
-                }
-            },
-            "args": [],
-            "cwd": "${workspaceFolder}"
-        },
-        {
-            "type": "lldb",
-            "request": "launch",
-            "name": "Debug unit tests in example 'sponza'",
-            "cargo": {
-                "args": [
-                    "test",
-                    "--no-run",
-                    "--example=sponza",
-                    "--package=bevy_slyedoc_bvh"
-                ],
-                "filter": {
-                    "name": "sponza",
-                    "kind": "example"
-                }
-            },
-            "args": [],
-            "cwd": "${workspaceFolder}"
-        },
-        {
-            "type": "lldb",
-            "request": "launch",
-            "name": "Debug example 'img'",
-            "cargo": {
-                "args": [
-                    "build",
-                    "--example=img",
-                    "--package=bevy_slyedoc_bvh"
-                ],
-                "filter": {
-                    "name": "img",
-                    "kind": "example"
-                }
-            },
-            "args": [],
-            "cwd": "${workspaceFolder}"
-        },
-        {
-            "type": "lldb",
-            "request": "launch",
-            "name": "Debug unit tests in example 'img'",
-            "cargo": {
-                "args": [
-                    "test",
-                    "--no-run",
-                    "--example=img",
-                    "--package=bevy_slyedoc_bvh"
-                ],
-                "filter": {
-                    "name": "img",
-                    "kind": "example"
                 }
             },
             "args": [],
@@ -142,7 +31,7 @@
                 "args": [
                     "build",
                     "--example=clock_tower",
-                    "--package=bevy_slyedoc_bvh"
+                    "--package=raven_bvh"
                 ],
                 "filter": {
                     "name": "clock_tower",
@@ -161,7 +50,7 @@
                     "test",
                     "--no-run",
                     "--example=clock_tower",
-                    "--package=bevy_slyedoc_bvh"
+                    "--package=raven_bvh"
                 ],
                 "filter": {
                     "name": "clock_tower",
@@ -179,7 +68,8 @@
                 "args": [
                     "build",
                     "--example=main",
-                    "--package=bevy_slyedoc_bvh"
+                    "--package=raven_bvh",
+                    "--features=camera"
                 ],
                 "filter": {
                     "name": "main",
@@ -198,7 +88,7 @@
                     "test",
                     "--no-run",
                     "--example=main",
-                    "--package=bevy_slyedoc_bvh"
+                    "--package=raven_bvh"
                 ],
                 "filter": {
                     "name": "main",
@@ -211,16 +101,72 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug benchmark 'bvh'",
+            "name": "Debug example 'sponza'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--example=sponza",
+                    "--package=raven_bvh"
+                ],
+                "filter": {
+                    "name": "sponza",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in example 'sponza'",
             "cargo": {
                 "args": [
                     "test",
                     "--no-run",
-                    "--bench=bvh",
-                    "--package=bevy_slyedoc_bvh"
+                    "--example=sponza",
+                    "--package=raven_bvh"
                 ],
                 "filter": {
-                    "name": "bvh",
+                    "name": "sponza",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug benchmark 'bevy'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--bench=bevy",
+                    "--package=raven_bvh"
+                ],
+                "filter": {
+                    "name": "bevy",
+                    "kind": "bench"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug benchmark 'random_scene'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--bench=random_scene",
+                    "--package=raven_bvh"
+                ],
+                "filter": {
+                    "name": "random_scene",
                     "kind": "bench"
                 }
             },

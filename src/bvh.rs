@@ -1,6 +1,20 @@
 use crate::{BIN_COUNT, aabb::Aabb3dExt, tri::Tri};
-use bevy::{math::bounding::Aabb3d, prelude::*};
+use bevy::{math::bounding::Aabb3d, prelude::*, render::mesh::*};
 
+/// Note: we really want this to be 32 bytes, so things layout in on nice 64 bytes pages in memory, using Vec3A instead of Vec3 in
+/// aabb, puts us at 48, instead of 32, need to test this impact more
+// pub struct Aabb {
+//     pub min: Vec3,
+//     pub max: Vec3,
+// }
+
+// pub struct BvhNodeTest {
+//     pub aabb: Aabb,
+//     pub left_right: u32, // 2x16 bits
+//     pub blas: u32,
+// }
+
+/// A BVH node, which is a node in the bounding volume hierarchy (BVH).
 #[derive(Debug, Clone, Copy)]
 pub struct BvhNode {
     pub aabb: Aabb3d,
@@ -19,83 +33,93 @@ impl Default for BvhNode {
 }
 
 impl BvhNode {
+    #[inline]
     pub fn is_leaf(&self) -> bool {
         self.tri_count > 0
     }
 
+    #[inline]
     pub fn calculate_cost(&self) -> f32 {
-        let area = self.aabb.area();
-        self.tri_count as f32 * area
+        self.tri_count as f32 * self.aabb.area()
     }
 }
 
-#[derive(Debug)]
-pub struct BvhInstance {
-    pub entity: Entity,
-    pub bvh_index: usize,
-    pub inv_trans: Mat4,
-    pub bounds: Aabb3d,
-}
+#[derive(Component, Clone, Debug, Deref, DerefMut, Reflect)]
+#[reflect(Component)]
+pub struct MeshBvhAabb(pub Aabb3d);
 
-impl BvhInstance {
-    pub fn new(entity: Entity, bvh_index: usize) -> Self {
-        Self {
-            entity,
-            bvh_index,
-            inv_trans: Mat4::default(),
-            bounds: Aabb3d::init(),
-        }
-    }
+/// Assumes entity has Aabb
+#[derive(Component, Clone, Debug, Deref, DerefMut, Reflect)]
+#[reflect(Component)]
+#[derive(Default)]
+pub struct MeshBvh(pub Handle<Bvh>);
 
-    pub fn update(&mut self, trans: &GlobalTransform, root: &BvhNode) {
-        // Update inv transfrom matrix for faster intersections
-        let trans_matrix = trans.compute_matrix();
-        self.inv_trans = trans_matrix.inverse();
-
-        // calculate world-space bounds using the new matrix
-        let bmin = root.aabb.min;
-        let bmax = root.aabb.max;
-        for i in 0..8 {
-            self.bounds.expand(trans_matrix.transform_point3a(vec3a(
-                if i & 1 != 0 { bmax.x } else { bmin.x },
-                if i & 2 != 0 { bmax.y } else { bmin.y },
-                if i & 4 != 0 { bmax.z } else { bmin.z },
-            )));
-        }
-    }
-}
-
-#[derive(Default, Component, Debug)]
+#[derive(Asset, Default, TypePath, Debug)]
 pub struct Bvh {
     pub nodes: Vec<BvhNode>,
     pub tris: Vec<Tri>,
     pub triangle_indexs: Vec<usize>,
 }
 
+impl From<&Mesh> for Bvh {
+    fn from(mesh: &Mesh) -> Self {
+        let triangles = match mesh.primitive_topology() {
+            PrimitiveTopology::TriangleList => {
+                let indexes = match mesh.indices().expect("Mesh should have Indices") {
+                    Indices::U32(vec) => &vec.iter().map(|i| *i as usize).collect::<Vec<_>>(),
+                    Indices::U16(vec) => &vec.iter().map(|i| *i as usize).collect::<Vec<_>>(),
+                };
+                let verts = match mesh
+                    .attribute(Mesh::ATTRIBUTE_POSITION)
+                    .expect("Mesh should have Position Attribute")
+                {
+                    VertexAttributeValues::Float32x3(vec) => {
+                        vec.iter().map(|vec| vec3a(vec[0], vec[1], vec[2]))
+                    }
+                    _ => todo!(),
+                }
+                .collect::<Vec<_>>();
+
+                let mut triangles = Vec::with_capacity(indexes.len() / 3);
+                for tri_indexes in indexes.chunks(3) {
+                    triangles.push(Tri::new(
+                        verts[tri_indexes[0]],
+                        verts[tri_indexes[1]],
+                        verts[tri_indexes[2]],
+                    ));
+                }
+                triangles
+            }
+            _ => unimplemented!(),
+        };
+        Self::new(triangles)
+    }
+}
+
 impl Bvh {
-    // TODO: need far better way to get tris from bevy mesh
     pub fn new(triangles: Vec<Tri>) -> Bvh {
         let count = triangles.len() as u32;
+        let mut nodes = Vec::with_capacity(64);
+        nodes.push(BvhNode {
+            left_first: 0,
+            tri_count: count,
+            aabb: Aabb3d::init(),
+        });
+
+        // Note: Due to no longer being 32 bytes, we can no longer add dummy nodes to align the tree to 64 bytes
+        // nodes.push(BvhNode {
+        //     left_first: 0,
+        //     tri_count: 0,
+        //     aabb: Aabb3d::init(),
+        // });
+
         let mut bvh = Bvh {
             tris: triangles,
-            nodes: {
-                // Add root node and empty node to offset 1
-                let mut nodes = Vec::with_capacity(64);
-                nodes.push(BvhNode {
-                    left_first: 0,
-                    tri_count: count,
-                    aabb: Aabb3d::init(),
-                });
-                nodes.push(BvhNode {
-                    left_first: 0,
-                    tri_count: 0,
-                    aabb: Aabb3d::init(),
-                });
-                nodes
-            },
+            nodes,
             triangle_indexs: (0..count as usize).collect::<Vec<_>>(),
         };
 
+        // build the BVH
         bvh.update_node_bounds(0);
         bvh.subdivide_node(0);
         bvh
@@ -128,16 +152,9 @@ impl Bvh {
         for i in 0..node.tri_count {
             let leaf_tri_index = self.triangle_indexs[(node.left_first + i) as usize];
             let leaf_tri = self.tris[leaf_tri_index];
-            // node.aabb.expand(leaf_tri.vertex0);
-            // node.aabb.expand(leaf_tri.vertex1);
-            // node.aabb.expand(leaf_tri.vertex2);
-
-            node.aabb.min = node.aabb.min.min(leaf_tri.vertex0);
-            node.aabb.min = node.aabb.min.min(leaf_tri.vertex1);
-            node.aabb.min = node.aabb.min.min(leaf_tri.vertex2);
-            node.aabb.max = node.aabb.max.max(leaf_tri.vertex0);
-            node.aabb.max = node.aabb.max.max(leaf_tri.vertex1);
-            node.aabb.max = node.aabb.max.max(leaf_tri.vertex2);
+            node.aabb.expand(leaf_tri.vertex0);
+            node.aabb.expand(leaf_tri.vertex1);
+            node.aabb.expand(leaf_tri.vertex2);
         }
     }
 

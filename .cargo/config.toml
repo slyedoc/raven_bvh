@@ -1,13 +1,13 @@
 # https://bevyengine.org/learn/quick-start/getting-started/setup/
 # cranuse for compile time
-[unstable]
-codegen-backend = true
+# [unstable]
+# codegen-backend = true
 
-[profile.dev]
-codegen-backend = "cranelift"
+# [profile.dev]
+# codegen-backend = "cranelift"
 
-[profile.dev.package."*"]
-codegen-backend = "llvm"
+# [profile.dev.package."*"]
+# codegen-backend = "llvm"
 
 
 # Generic Sharing

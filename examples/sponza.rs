@@ -50,6 +50,6 @@ fn setup(
         ),
         // This marker tells the BVH system to build nested children
         // for this entity, waits till asset is loaded
-        BvhScene,
+        SpawnSceneBvhs,
     ));
 }
