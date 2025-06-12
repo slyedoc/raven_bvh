@@ -22,10 +22,10 @@ use crate::{
 
 /// A TLAS node, which is a node in the top-level acceleration structure (TLAS).
 #[derive(Debug, Copy, Clone)]
-pub enum TNType {
+pub enum TlasNodeType {
     Leaf(Entity),
     Branch {
-        left: u16, // index of left child in TLAS nodes
+        left: u16,  // index of left child in TLAS nodes
         right: u16, // index of right child in TLAS nodes
     },
 }
@@ -33,7 +33,7 @@ pub enum TNType {
 #[derive(Debug, Copy, Clone)]
 pub struct TlasNode {
     pub aabb: Aabb3d,
-    pub node_type: TNType,
+    pub node_type: TlasNodeType,
 }
 
 // TODO: This is left in a invade state,
@@ -41,14 +41,14 @@ impl Default for TlasNode {
     fn default() -> Self {
         TlasNode {
             aabb: Aabb3d::init(),
-            node_type: TNType::Branch { left: 0, right: 0 },
+            node_type: TlasNodeType::Branch { left: 0, right: 0 },
         }
     }
 }
 
 impl TlasNode {
     pub fn is_leaf(&self) -> bool {
-        matches!(self.node_type, TNType::Leaf { .. })
+        matches!(self.node_type, TlasNodeType::Leaf { .. })
     }
 }
 
@@ -80,7 +80,7 @@ impl Tlas {
 #[derive(SystemParam)]
 pub struct TlasCast<'w, 's> {
     pub tlas: Res<'w, Tlas>,
-    pub bvhs: Res<'w, Assets<Bvh>>,    
+    pub bvhs: Res<'w, Assets<Bvh>>,
     pub query: Query<'w, 's, (Entity, Read<MeshBvh>, Read<GlobalTransform>)>,
 }
 
@@ -100,10 +100,10 @@ impl<'w, 's> TlasCast<'w, 's> {
 
         loop {
             match node.node_type {
-                TNType::Leaf(e) => {                    
-                    let (_e, mesh_bvh, global_trans) = self.query.get(e).unwrap();                                        
+                TlasNodeType::Leaf(e) => {
+                    let (_e, mesh_bvh, global_trans) = self.query.get(e).unwrap();
                     // convert the ray to local space of the e
-                    let (local_ray, dir_scale) = ray.to_local(global_trans);                    
+                    let (local_ray, dir_scale) = ray.to_local(global_trans);
 
                     // test vs bvh
                     let bvh = self.bvhs.get(&mesh_bvh.0).unwrap();
@@ -127,7 +127,7 @@ impl<'w, 's> TlasCast<'w, 's> {
                         break;
                     }
                 }
-                TNType::Branch { left, right } => {
+                TlasNodeType::Branch { left, right } => {
                     let mut child1 = &self.tlas.tlas_nodes[right as usize];
                     let mut child2 = &self.tlas.tlas_nodes[left as usize];
                     let mut dist1 = ray.aabb_intersection_at(&child1.aabb);

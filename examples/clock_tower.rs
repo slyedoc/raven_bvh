@@ -55,12 +55,10 @@ fn setup(
         SpawnMeshBvh, // This Marker will have our mesh added
     ));
 
-
     /// This is to test when our Transform has odd scaling
     commands.spawn((
         Name::new("Clock Tower"),
-        Transform::from_xyz(0.0, 4.0, -10.0)
-            .with_scale(Vec3::splat(0.001)), // scale it to miniture size
+        Transform::from_xyz(0.0, 4.0, -10.0).with_scale(Vec3::splat(0.001)), // scale it to miniture size
         SceneRoot(
             asset_server.load(GltfAssetLabel::Scene(0).from_asset("models/clock-tower/scene.glb")),
         ),

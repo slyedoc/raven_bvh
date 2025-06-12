@@ -1,10 +1,5 @@
-use crate::{
-    bvh::{Bvh, Tri},    
-};
-use bevy::{
-    math::bounding::RayCast3d,
-    prelude::*,
-};
+use crate::bvh::{Bvh, Tri};
+use bevy::{math::bounding::RayCast3d, prelude::*};
 use std::mem::swap;
 
 #[derive(Debug, Clone, Copy)]
@@ -12,7 +7,7 @@ pub struct Hit {
     pub distance: f32, // intersection distance along ray, often seen as t
     pub u: f32,        // barycentric coordinates of the intersection
     pub v: f32,
-    pub tri_index: usize,    
+    pub tri_index: usize,
 }
 
 impl Default for Hit {
@@ -21,7 +16,7 @@ impl Default for Hit {
             distance: 1e30f32,
             u: Default::default(),
             v: Default::default(),
-            tri_index: Default::default(),                        
+            tri_index: Default::default(),
         }
     }
 }
@@ -30,16 +25,12 @@ pub trait RayCastExt {
     /// Converting ray into another space, and how much the range was scaled by
     fn to_local(&self, transform: &GlobalTransform) -> (RayCast3d, f32);
 
-    /// Get the point at a given distance along the ray.    
-    fn get_point(&self, distance: f32) -> Vec3A;
+    // /// Get the point at a given distance along the ray.
+    // fn get_point(&self, distance: f32) -> Vec3A;
 
     fn intersect_triangle(&self, tri: &Tri, tri_index: usize) -> Option<Hit>;
 
-    //fn intersect_tlas(&self, tlas: &Tlas) -> Option<Hit>;
-
     fn intersect_bvh(&self, bvh: &Bvh) -> Option<Hit>;
-
-    // fn intersect_bvh_instance(&self, bvh_instance: &BvhInstance, bvhs: &[Bvh]) -> Option<Hit>;
 }
 
 impl RayCastExt for RayCast3d {
@@ -51,17 +42,20 @@ impl RayCastExt for RayCast3d {
         // Compute how much the direction vector changed length
         let dir_scale = local_dir.length() / self.direction.as_vec3a().length();
 
-        (RayCast3d::new(
-            local_origin,
-            Dir3A::new(local_dir).unwrap(),
-            self.max * dir_scale
-        ), dir_scale)
+        (
+            RayCast3d::new(
+                local_origin,
+                Dir3A::new(local_dir).unwrap(),
+                self.max * dir_scale,
+            ),
+            dir_scale,
+        )
     }
 
-    #[inline]
-    fn get_point(&self, distance: f32) -> Vec3A {
-        self.origin + *self.direction * distance
-    }
+    // #[inline]
+    // fn get_point(&self, distance: f32) -> Vec3A {
+    //     self.origin + *self.direction * distance
+    // }
 
     #[inline(always)]
     fn intersect_triangle(&self, tri: &Tri, tri_index: usize) -> Option<Hit> {
@@ -94,8 +88,8 @@ impl RayCastExt for RayCast3d {
                 distance: t,
                 u,
                 v,
-                tri_index,                
-            });            
+                tri_index,
+            });
         }
         None
     }
@@ -115,9 +109,7 @@ impl RayCastExt for RayCast3d {
             if node.is_leaf() {
                 for i in 0..node.tri_count {
                     let tri_index = bvh.triangle_indexs[(node.left_first + i) as usize];
-                    if let Some(hit) =
-                        ray.intersect_triangle(&bvh.tris[tri_index], tri_index)
-                    {
+                    if let Some(hit) = ray.intersect_triangle(&bvh.tris[tri_index], tri_index) {
                         if let Some(best) = best_hit {
                             if hit.distance < best.distance {
                                 best_hit = Some(hit);
@@ -160,5 +152,5 @@ impl RayCastExt for RayCast3d {
             }
         }
         best_hit
-    }    
+    }
 }

@@ -1,4 +1,4 @@
-use bevy::{prelude::*, app::AppExit};
+use bevy::{app::AppExit, prelude::*};
 
 pub struct ExitPlugin;
 
@@ -8,11 +8,8 @@ impl Plugin for ExitPlugin {
     }
 }
 
-fn update_escape(
-    input: Res<ButtonInput<KeyCode>>,
-    mut app_exit: EventWriter<AppExit>,
-) {
+fn update_escape(input: Res<ButtonInput<KeyCode>>, mut app_exit: EventWriter<AppExit>) {
     if input.just_pressed(KeyCode::Escape) {
-       app_exit.write(AppExit::Success);       
+        app_exit.write(AppExit::Success);
     }
 }

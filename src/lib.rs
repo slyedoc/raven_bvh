@@ -1,10 +1,13 @@
-#![feature(test)]
-extern crate test;
+//#![feature(test)]
+//#extern crate test;
 
 #[allow(unused_imports)]
 #[cfg(feature = "debug_draw")]
 use bevy::color::palettes::tailwind;
-use bevy::{math::bounding::{Aabb3d, BoundingVolume}, prelude::*};
+use bevy::{
+    math::bounding::{Aabb3d, BoundingVolume},
+    prelude::*,
+};
 
 mod aabb;
 mod bvh;
@@ -26,8 +29,7 @@ pub mod prelude {
     #[cfg(feature = "camera")]
     pub use crate::camera::*;
     pub use crate::{
-        BvhPlugin, BvhSystems, SpawnMeshBvh, SpawnSceneBvhs, bvh::*, debug::*, tlas::*,
-        util::*,
+        BvhPlugin, BvhSystems, SpawnMeshBvh, SpawnSceneBvhs, bvh::*, debug::*, tlas::*, util::*,
     };
 }
 
@@ -46,7 +48,7 @@ impl Plugin for BvhPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<Tlas>()
             .init_resource::<BvhDebugMode>()
-            .init_asset::<Bvh>()            
+            .init_asset::<Bvh>()
             .add_systems(
                 PostUpdate,
                 (
@@ -150,22 +152,34 @@ pub fn build_tlas(
     // fill the tlas all the leaf nodes
     for (i, (e, b, global_trans)) in query.iter().enumerate() {
         let bvh = bvhs.get(&b.0).expect("Bvh not found");
-                
+
         // convert the AABB to world space
         let local_aabb = bvh.nodes[0].aabb.clone(); // root node AABB
 
         // This would be ideal, but the scale only works if the aabb is centered local space, saidly not always the case
         // let world_aabb = local_aabb
         //     .scale_around_center(global_trans.scale())
-        //     .transformed_by(global_trans.translation(), global_trans.rotation());  
+        //     .transformed_by(global_trans.translation(), global_trans.rotation());
 
         // instead we will project the corners of the local AABB to world space
         let mut world_aabb = Aabb3d::init();
         for i in 0..8 {
             let corner = Vec3A::new(
-                if i & 1 == 0 { local_aabb.min.x } else { local_aabb.max.x },
-                if i & 2 == 0 { local_aabb.min.y } else { local_aabb.max.y },
-                if i & 4 == 0 { local_aabb.min.z } else { local_aabb.max.z },
+                if i & 1 == 0 {
+                    local_aabb.min.x
+                } else {
+                    local_aabb.max.x
+                },
+                if i & 2 == 0 {
+                    local_aabb.min.y
+                } else {
+                    local_aabb.max.y
+                },
+                if i & 4 == 0 {
+                    local_aabb.min.z
+                } else {
+                    local_aabb.max.z
+                },
             );
 
             let world_pos = global_trans.affine().transform_point3a(corner);
@@ -175,7 +189,7 @@ pub fn build_tlas(
         node_index[i] = i as u32 + 1;
         tlas.tlas_nodes.push(TlasNode {
             aabb: world_aabb,
-            node_type: TNType::Leaf(e),
+            node_type: TlasNodeType::Leaf(e),
         });
     }
 
@@ -191,7 +205,7 @@ pub fn build_tlas(
             let node_b = tlas.tlas_nodes[node_index_b as usize];
             tlas.tlas_nodes.push(TlasNode {
                 aabb: node_a.aabb.merge(&node_b.aabb),
-                node_type: TNType::Branch {
+                node_type: TlasNodeType::Branch {
                     left: node_index_a as u16,
                     right: node_index_b as u16,
                 },
@@ -207,5 +221,3 @@ pub fn build_tlas(
     }
     tlas.tlas_nodes[0] = tlas.tlas_nodes[node_index[a as usize] as usize];
 }
-
-

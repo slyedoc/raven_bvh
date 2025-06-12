@@ -16,6 +16,15 @@ pub struct BvhNode {
     pub tri_count: u32,
 }
 
+// TODO: makes this more rusty
+//  pub enum BvhNodeType {
+//      Leaf { tri_count: u32},
+//      Branch {
+//          left_first: u32,
+//          // right will be left_first + 1
+//      },
+//  }
+
 impl Default for BvhNode {
     fn default() -> Self {
         BvhNode {
@@ -37,7 +46,6 @@ impl BvhNode {
         self.tri_count as f32 * self.aabb.area()
     }
 }
-
 
 /// A handle to a BVH asset
 #[derive(Component, Default, Clone, Debug, Deref, DerefMut, Reflect)]
@@ -148,7 +156,7 @@ impl Bvh {
             node.aabb.expand(leaf_tri.vertex0);
             node.aabb.expand(leaf_tri.vertex1);
             node.aabb.expand(leaf_tri.vertex2);
-        }        
+        }
     }
 
     fn subdivide_node(&mut self, node_idx: usize) {
@@ -196,7 +204,7 @@ impl Bvh {
 
         self.update_node_bounds(left_child_idx as usize);
         self.update_node_bounds(right_child_idx as usize);
-        
+
         // recurse
         self.subdivide_node(left_child_idx as usize);
         self.subdivide_node(right_child_idx as usize);

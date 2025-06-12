@@ -60,7 +60,6 @@ fn setup(
             (
                 Name::new("Box - Inside1"),
                 Transform::from_xyz(-2., 0., 0.),
-
                 Mesh3d(meshes.add(Cuboid::new(1.0, 1.0, 1.0).mesh())),
                 MeshMaterial3d(materials.add(StandardMaterial {
                     base_color: tailwind::GRAY_700.into(),
@@ -71,7 +70,6 @@ fn setup(
             (
                 Name::new("Box - Inside2"),
                 Transform::from_xyz(2., 0., 0.),
-
                 Mesh3d(meshes.add(Cuboid::new(1.0, 1.0, 1.0).mesh())),
                 MeshMaterial3d(materials.add(StandardMaterial {
                     base_color: tailwind::GRAY_700.into(),

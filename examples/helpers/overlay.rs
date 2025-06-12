@@ -111,7 +111,6 @@
 //         .insert(Name::new("ui Render Time"))
 //         .insert(RenderTimeText);
 
-
 //         commands
 //         .spawn_bundle(TextBundle {
 //             style: Style {
@@ -192,8 +191,6 @@
 //         .insert(FpsText);
 // }
 
-
-
 // #[allow(dead_code)]
 // fn update_bvh_tri_count(mut query: Query<&mut Text, With<TriCountText>>, stats: Res<BvhStats>) {
 //     for mut text in query.iter_mut() {
@@ -217,4 +214,3 @@
 //         text.sections[1].value = format!("{:.0} Mps", stats.ray_count as f32 / stats.camera_time.as_micros() as f32);
 //     }
 // }
-

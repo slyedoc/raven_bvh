@@ -28,7 +28,7 @@ pub fn aabb3d_transform(bounding: &Aabb3d, transform: &GlobalTransform) -> Globa
 pub enum BvhDebugMode {
     #[default]
     Disabled,
-    Bvhs,    
+    Bvhs,
     Tlas,
 }
 
@@ -69,7 +69,7 @@ pub fn debug_gimos(
             }
         }
     }
-    
+
     // gizmos.cuboid(
     //     aabb3d_global(&Aabb3d {
     //         min: Vec3A::splat(-1.0),

@@ -49,7 +49,6 @@ fn scene_100k_1024() {
     app.update();
     let image = get_image(app, camera_id);
 
-
     let file_path = "tmp/bevy_100k_1024x1024.png";
     image.save(file_path).unwrap();
     println!("Camera image saved to: {}", file_path);
@@ -100,14 +99,12 @@ pub fn random_scene_100k_256(b: &mut Bencher) {
     });
 }
 
-
-
 fn setup_app<const GROUP_COUNT: usize, const TRI_PER_GROUP: usize, const RESOLUTION: u32>()
 -> (App, Entity) {
     let mut app = App::new();
-    app.add_plugins((        
+    app.add_plugins((
         MinimalPlugins,
-        TransformPlugin,        
+        TransformPlugin,
         AssetPlugin::default(),
         ImagePlugin::default(),
         MeshPlugin,
@@ -152,9 +149,7 @@ fn get_image(app: App, camera_id: Entity) -> ImageBuffer<Rgb<u8>, Vec<u8>> {
         .try_into_dynamic()
         .expect("Failed to convert image to dynamic")
         .to_rgb8()
-    
 }
-
 
 /// This is odd but its from non-`bevy` code, kept here so I could benchmark vs old code
 fn build_random_tri_scene<const GROUP_COUNT: usize, const TRI_PER_GROUP: usize>(

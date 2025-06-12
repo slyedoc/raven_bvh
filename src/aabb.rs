@@ -1,4 +1,4 @@
-use bevy::{math::bounding::Aabb3d, prelude::* };
+use bevy::{math::bounding::Aabb3d, prelude::*};
 
 pub trait Aabb3dExt {
     fn init() -> Self;
@@ -11,7 +11,6 @@ pub trait Aabb3dExt {
 }
 
 impl Aabb3dExt for Aabb3d {
-    
     /// Initializes an Aabb3d with impossibly values, always set after init to this
     // TODO: remove this
     #[inline]
@@ -21,7 +20,7 @@ impl Aabb3dExt for Aabb3d {
             max: Vec3A::splat(-1e30f32),
         }
     }
-    
+
     #[inline]
     fn area(&self) -> f32 {
         let e = self.max - self.min;

@@ -4,7 +4,7 @@ use crate::tlas::{Tlas, TlasCast};
 
 use bevy::{
     asset::RenderAssetUsages,
-    math::{vec3, bounding::RayCast3d},
+    math::{bounding::RayCast3d, vec3},
     prelude::*,
     render::render_resource::{Extent3d, TextureDimension, TextureFormat},
     tasks::{ComputeTaskPool, ParallelSliceMut},
@@ -21,7 +21,7 @@ impl Plugin for BvhCameraPlugin {
             (init_camera_image, render_camera, camera_ui)
                 .chain()
                 .after(BvhSystems::Update)
-                .in_set(BvhSystems::Camera)
+                .in_set(BvhSystems::Camera),
         );
     }
 }
@@ -71,7 +71,7 @@ pub fn render_camera(
     for (bvh_camera, trans) in cameras.iter() {
         if let Some(image) = &bvh_camera.image {
             let image = images.get_mut(image).unwrap();
-            
+
             let vfov: f32 = 45.0; // vertical field of view
             let focus_dist: f32 = 1.0; // TODO: not using this yet
 
@@ -92,7 +92,7 @@ pub fn render_camera(
 
             // TODO: Make this acutally tilings, currenty this just takes a slice pixels in a row
             const PIXEL_TILE_COUNT: usize = 64;
-            const PIXEL_TILE: usize = 4 * PIXEL_TILE_COUNT;            
+            const PIXEL_TILE: usize = 4 * PIXEL_TILE_COUNT;
             if let Some(data) = &mut image.data {
                 data.par_chunk_map_mut(ComputeTaskPool::get(), PIXEL_TILE, |i, pixels| {
                     for pixel_offset in 0..(pixels.len() / 4) {
@@ -107,7 +107,8 @@ pub fn render_camera(
                         let v = 1.0 - (y as f32 / bvh_camera.height as f32);
 
                         let direction = lower_left_corner + u * horizontal + v * vertical - origin;
-                        let ray = RayCast3d::new(origin, Dir3A::new(direction.into()).unwrap(), 1e30f32);                        
+                        let ray =
+                            RayCast3d::new(origin, Dir3A::new(direction.into()).unwrap(), 1e30f32);
 
                         // intersect the ray with the TLAS
                         let color = if let Some((_e, hit)) = tlas_cast.intersect_tlas(&ray) {

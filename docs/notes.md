@@ -1,15 +1,26 @@
 # Notes
 
-Useful command to convert .jpg to .png
+## Bench
 
 ```bash
-find . -name "*.jpg" -exec mogrify -format png {} \;
+ cargo bench --features camera 
 ```
 
-Create and compare bench baselines, see [critcmp](https://github.com/BurntSushi/critcmp)
+To save to compare:
 
 ```bash
-cargo bench -- -save-baseline before 
-cargo bench -- -save-baseline change
-critcmp before change
+cargo bench --features camera > ./tmp/base
 ```
+
+Make change, then:
+
+```bash
+cargo bench --features camera > ./tmp/change
+```
+
+Then to compare with [benchcmp](https://github.com/BurntSushi/cargo-benchcmp):
+
+```bash
+cargo benchcmp ./tmp/base ./tmp/change      
+```
+

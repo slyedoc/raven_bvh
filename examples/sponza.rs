@@ -1,19 +1,15 @@
 mod helpers;
 use helpers::*;
 
+use crate::helpers::camera_free::CameraFree;
 use bevy::prelude::*;
 use raven_bvh::prelude::*;
-use crate::helpers::camera_free::CameraFree;
 
 /// This is by far the worse performing example, far more triangles than the others
 
 fn main() {
     App::new()
-        .add_plugins((
-            DefaultPlugins,
-            HelperPlugin,
-            BvhPlugin
-        ))
+        .add_plugins((DefaultPlugins, HelperPlugin, BvhPlugin))
         .add_systems(Startup, setup)
         .run();
 }
@@ -41,7 +37,7 @@ fn setup(
     commands.spawn((
         DirectionalLight::default(),
         Transform::from_xyz(50.0, 50.0, 50.0).looking_at(Vec3::ZERO, Vec3::Y),
-    ));    
+    ));
 
     commands.spawn((
         Name::new("Sponza"),
