@@ -1,110 +1,72 @@
-use bevy::prelude::*;
+use std::mem::swap;
 
+use bevy::{
+    ecs::system::{SystemParam, lifetimeless::Read},
+    math::bounding::{Aabb3d, BoundingVolume, RayCast3d},
+    prelude::*,
+};
 
-use crate::{ Bvh, BvhInstance, Aabb};
+use crate::{
+    Bvh,
+    aabb::Aabb3dExt,
+    bvh::MeshBvh,
+    util::{Hit, RayCastExt},
+};
 
-#[derive(Default, Debug, Copy, Clone)]
+/// Note: we really want this to be 32 bytes, so things layout in on nice 64 bytes cache lines, but using Vec3A instead of Vec3 in
+/// aabb, puts us at 48 instead of 32, need to test this impact more
+// pub struct Aabb {
+//     pub min: Vec3,
+//     pub max: Vec3,
+// }
+
+/// A TLAS node, which is a node in the top-level acceleration structure (TLAS).
+#[derive(Debug, Copy, Clone)]
+pub enum TNType {
+    Leaf(Entity),
+    Branch {
+        left: u16, // index of left child in TLAS nodes
+        right: u16, // index of right child in TLAS nodes
+    },
+}
+
+#[derive(Debug, Copy, Clone)]
 pub struct TlasNode {
-    pub aabb: Aabb,
-    pub left_right: u32, // 2x16 bits    
-    pub blas: u32,
+    pub aabb: Aabb3d,
+    pub node_type: TNType,
+}
+
+// TODO: This is left in a invade state,
+impl Default for TlasNode {
+    fn default() -> Self {
+        TlasNode {
+            aabb: Aabb3d::init(),
+            node_type: TNType::Branch { left: 0, right: 0 },
+        }
+    }
 }
 
 impl TlasNode {
     pub fn is_leaf(&self) -> bool {
-        self.left_right == 0
+        matches!(self.node_type, TNType::Leaf { .. })
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default, Resource)]
 pub struct Tlas {
-    pub tlas_nodes: Vec<TlasNode>,    
-    pub blas: Vec<BvhInstance>,
-    pub bvhs: Vec<Bvh>,
+    pub tlas_nodes: Vec<TlasNode>,
 }
 
-impl Default for Tlas {
-    fn default() -> Self {
-        Tlas {
-            tlas_nodes: Vec::with_capacity(0),
-            blas: Default::default(),
-            bvhs: Default::default(),
-        }
-    }
-}
-
+/// A TLAS is a top-level acceleration structure that contains instances of bottom-level acceleration structures (BLAS).
 impl Tlas {
-    pub fn add_bvh(&mut self, bvh: Bvh) -> usize {
-        self.bvhs.push(bvh);
-        self.bvhs.len() - 1
-    }
-
-    pub fn add_instance(&mut self, instnace: BvhInstance) {
-        self.blas.push(instnace);
-    }
-
-    pub fn build(&mut self) {
-        self.tlas_nodes = Vec::with_capacity(self.blas.len() + 1);
-        // reserve root node
-        self.tlas_nodes.push(TlasNode::default());
-
-        let mut node_index = vec![0u32; self.blas.len() + 1];
-        let mut node_indices = self.blas.len() as i32;
-        
-        // assign a TLASleaf node to each BLAS
-        // and index
-        for (i, b) in self.blas.iter().enumerate() {
-            node_index[i] = i as u32 + 1;
-            self.tlas_nodes.push(TlasNode {
-                aabb: b.bounds,
-                left_right: 0, // is leaf
-                blas: i as u32,
-            });
-        }
-
-        // use agglomerative clustering to build the TLAS
-        let mut a = 0i32;
-        let mut b = self.find_best_match(&node_index, node_indices, a);
-        while node_indices > 1 {
-            let c = self.find_best_match(&node_index, node_indices, b);
-            if a == c {
-                let node_index_a = node_index[a as usize];
-                let node_index_b = node_index[b as usize];
-                let node_a = &self.tlas_nodes[node_index_a as usize];
-                let node_b = &self.tlas_nodes[node_index_b as usize];
-                self.tlas_nodes.push(TlasNode {
-                    aabb: Aabb {
-                        bmin: node_a.aabb.bmin.min(node_b.aabb.bmin),
-                        bmax: node_a.aabb.bmax.max(node_b.aabb.bmax),
-                    },
-                    left_right: node_index_a + (node_index_b << 16),
-                    blas: 0,
-                });
-                node_index[a as usize] = self.tlas_nodes.len() as u32 - 1;
-                node_index[b as usize] = node_index[node_indices as usize - 1];
-                node_indices -= 1;
-                b = self.find_best_match(&node_index, node_indices, a);
-            } else {
-                a = b;
-                b = c;
-            }
-        }
-        self.tlas_nodes[0] = self.tlas_nodes[node_index[a as usize] as usize];
-    }
-
     pub fn find_best_match(&self, list: &[u32], n: i32, a: i32) -> i32 {
         let mut smallest = 1e30f32;
         let mut best_b = -1i32;
         for b in 0..n {
             if b != a {
-                let bmax = self.tlas_nodes[list[a as usize] as usize]
-                    .aabb.bmax
-                    .max(self.tlas_nodes[list[b as usize] as usize].aabb.bmax);
-                let bmin = self.tlas_nodes[list[a as usize] as usize]
-                    .aabb.bmin
-                    .min(self.tlas_nodes[list[b as usize] as usize].aabb.bmin);
-                let e = bmax - bmin;
-                let surface_area = e.x * e.y + e.y * e.z + e.z * e.x;
+                let node_a = &self.tlas_nodes[list[a as usize] as usize];
+                let node_b = &self.tlas_nodes[list[b as usize] as usize];
+                let surface_area = node_a.aabb.merge(&node_b.aabb).area();
                 if surface_area < smallest {
                     smallest = surface_area;
                     best_b = b;
@@ -113,13 +75,86 @@ impl Tlas {
         }
         best_b
     }
+}
 
-    pub fn update_bvh_instances(&mut self, query: &Query<&GlobalTransform>) {
-        for instance in &mut self.blas {
-            let bvh = &self.bvhs[instance.bvh_index];
-            if let Ok(trans) = query.get(instance.entity) {
-                instance.update(trans, &bvh.nodes[0]);
+#[derive(SystemParam)]
+pub struct TlasCast<'w, 's> {
+    pub tlas: Res<'w, Tlas>,
+    pub bvhs: Res<'w, Assets<Bvh>>,    
+    pub query: Query<'w, 's, (Entity, Read<MeshBvh>, Read<GlobalTransform>)>,
+}
+
+impl<'w, 's> TlasCast<'w, 's> {
+    pub fn intersect_tlas(&self, ray: &RayCast3d) -> Option<(Entity, Hit)> {
+        // PERF: clone the ray so we can update max distance as we find hits to tighten our search,
+        // more complex the scene the bigger the performance win
+        let mut ray = ray.clone();
+
+        if self.tlas.tlas_nodes.is_empty() || self.query.iter().count() == 0 {
+            return None;
+        }
+        let mut stack = Vec::<&TlasNode>::with_capacity(64);
+        let mut node = &self.tlas.tlas_nodes[0];
+        let mut best_hit: Option<Hit> = None;
+        let mut best_entity: Option<Entity> = None;
+
+        loop {
+            match node.node_type {
+                TNType::Leaf(e) => {                    
+                    let (_e, mesh_bvh, global_trans) = self.query.get(e).unwrap();                                        
+                    // convert the ray to local space of the e
+                    let (local_ray, dir_scale) = ray.to_local(global_trans);                    
+
+                    // test vs bvh
+                    let bvh = self.bvhs.get(&mesh_bvh.0).unwrap();
+                    if let Some(mut hit) = local_ray.intersect_bvh(bvh) {
+                        hit.distance /= dir_scale; // Convert back to world-space distance                        
+                        if let Some(best) = best_hit {
+                            if hit.distance < best.distance {
+                                best_hit = Some(hit);
+                                best_entity = Some(e);
+                                ray.max = hit.distance; // tighten the ray
+                            }
+                        } else {
+                            best_hit = Some(hit);
+                            best_entity = Some(e);
+                            ray.max = hit.distance; // tighten the ray
+                        }
+                    }
+                    if let Some(n) = stack.pop() {
+                        node = n;
+                    } else {
+                        break;
+                    }
+                }
+                TNType::Branch { left, right } => {
+                    let mut child1 = &self.tlas.tlas_nodes[right as usize];
+                    let mut child2 = &self.tlas.tlas_nodes[left as usize];
+                    let mut dist1 = ray.aabb_intersection_at(&child1.aabb);
+                    let mut dist2 = ray.aabb_intersection_at(&child2.aabb);
+                    if dist1.unwrap_or(f32::MAX) > dist2.unwrap_or(f32::MAX) {
+                        swap(&mut dist1, &mut dist2);
+                        swap(&mut child1, &mut child2);
+                    }
+                    if dist1.is_none() {
+                        if let Some(n) = stack.pop() {
+                            node = n;
+                        } else {
+                            break;
+                        }
+                    } else {
+                        node = child1;
+                        if dist2.is_some() {
+                            stack.push(child2);
+                        }
+                    }
+                }
             }
+        }
+        if let Some(hit) = best_hit {
+            Some((best_entity.unwrap(), hit))
+        } else {
+            None
         }
     }
 }
