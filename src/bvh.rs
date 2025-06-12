@@ -1,17 +1,11 @@
-use crate::{BIN_COUNT, aabb::Aabb3dExt, tri::Tri};
+use crate::{BIN_COUNT, aabb::Aabb3dExt};
 use bevy::{math::bounding::Aabb3d, prelude::*, render::mesh::*};
 
 /// Note: we really want this to be 32 bytes, so things layout in on nice 64 bytes pages in memory, using Vec3A instead of Vec3 in
-/// aabb, puts us at 48, instead of 32, need to test this impact more
+/// aabb, puts us at 48, instead of 32
 // pub struct Aabb {
 //     pub min: Vec3,
 //     pub max: Vec3,
-// }
-
-// pub struct BvhNodeTest {
-//     pub aabb: Aabb,
-//     pub left_right: u32, // 2x16 bits
-//     pub blas: u32,
 // }
 
 /// A BVH node, which is a node in the bounding volume hierarchy (BVH).
@@ -44,16 +38,13 @@ impl BvhNode {
     }
 }
 
-#[derive(Component, Clone, Debug, Deref, DerefMut, Reflect)]
-#[reflect(Component)]
-pub struct MeshBvhAabb(pub Aabb3d);
 
-/// Assumes entity has Aabb
-#[derive(Component, Clone, Debug, Deref, DerefMut, Reflect)]
+/// A handle to a BVH asset
+#[derive(Component, Default, Clone, Debug, Deref, DerefMut, Reflect)]
 #[reflect(Component)]
-#[derive(Default)]
 pub struct MeshBvh(pub Handle<Bvh>);
 
+/// Bounded Volume Hierarchy (BVH) spatial data structure used for efficient ray casting
 #[derive(Asset, Default, TypePath, Debug)]
 pub struct Bvh {
     pub nodes: Vec<BvhNode>,
@@ -100,6 +91,8 @@ impl Bvh {
     pub fn new(triangles: Vec<Tri>) -> Bvh {
         let count = triangles.len() as u32;
         let mut nodes = Vec::with_capacity(64);
+
+        // reserve a root node
         nodes.push(BvhNode {
             left_first: 0,
             tri_count: count,
@@ -155,7 +148,7 @@ impl Bvh {
             node.aabb.expand(leaf_tri.vertex0);
             node.aabb.expand(leaf_tri.vertex1);
             node.aabb.expand(leaf_tri.vertex2);
-        }
+        }        
     }
 
     fn subdivide_node(&mut self, node_idx: usize) {
@@ -203,6 +196,7 @@ impl Bvh {
 
         self.update_node_bounds(left_child_idx as usize);
         self.update_node_bounds(right_child_idx as usize);
+        
         // recurse
         self.subdivide_node(left_child_idx as usize);
         self.subdivide_node(right_child_idx as usize);
@@ -271,6 +265,25 @@ impl Bvh {
             }
         }
         (best_axis, split_pos, best_cost)
+    }
+}
+
+#[derive(Default, Debug, Copy, Clone)]
+pub struct Tri {
+    pub vertex0: Vec3A,
+    pub vertex1: Vec3A,
+    pub vertex2: Vec3A,
+    pub centroid: Vec3A,
+}
+
+impl Tri {
+    pub fn new(v0: Vec3A, v1: Vec3A, v2: Vec3A) -> Self {
+        Tri {
+            vertex0: v0,
+            vertex1: v1,
+            vertex2: v2,
+            centroid: (v0 + v1 + v2) / 3.0,
+        }
     }
 }
 

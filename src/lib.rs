@@ -1,10 +1,10 @@
 #![feature(test)]
 extern crate test;
 
-use bevy::{
-    math::bounding::BoundingVolume,
-    prelude::*,
-};
+#[allow(unused_imports)]
+#[cfg(feature = "debug_draw")]
+use bevy::color::palettes::tailwind;
+use bevy::{math::bounding::{Aabb3d, BoundingVolume}, prelude::*};
 
 mod aabb;
 mod bvh;
@@ -16,16 +16,17 @@ mod tlas;
 use tlas::*;
 mod debug;
 
-use crate::{
-    debug::{BvhDebug},
-};
-mod tri;
+use crate::{aabb::Aabb3dExt, debug::BvhDebugMode};
+
+#[allow(unused_imports)]
+#[cfg(feature = "debug_draw")]
+use crate::debug::*;
 
 pub mod prelude {
     #[cfg(feature = "camera")]
     pub use crate::camera::*;
     pub use crate::{
-        BvhPlugin, BvhSystems, SpawnMeshBvh, SpawnSceneBvhs, bvh::*, debug::*, tlas::*, tri::*,
+        BvhPlugin, BvhSystems, SpawnMeshBvh, SpawnSceneBvhs, bvh::*, debug::*, tlas::*,
         util::*,
     };
 }
@@ -44,30 +45,36 @@ pub struct BvhPlugin;
 impl Plugin for BvhPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<Tlas>()
-            .init_resource::<BvhDebug>()
-            .init_asset::<Bvh>()
-            .configure_sets(
-                PostUpdate,
-                (BvhSystems::Update, BvhSystems::Camera)
-                    .chain()
-                    .after(TransformSystem::TransformPropagate)                    
-            )
+            .init_resource::<BvhDebugMode>()
+            .init_asset::<Bvh>()            
             .add_systems(
                 PostUpdate,
-                (spawn_mesh_bvh, spawn_scene_bvhs, build_tlas)
+                (
+                    // Helpers to spawn BVH from Mesh3d and SceneRoot
+                    spawn_mesh_bvh,
+                    spawn_scene_bvhs,
+                    // build the tlas, shouldn't need full rebuild every frame, see refit, for now it is
+                    build_tlas,
+                )
                     .chain()
-                    .in_set(BvhSystems::Update),
+                    .in_set(BvhSystems::Update)
+                    .after(TransformSystem::TransformPropagate),
             );
 
         #[cfg(feature = "debug_draw")]
         app.add_systems(PostUpdate, debug::debug_gimos.after(BvhSystems::Update));
 
+        // Creates camera from tlas, used for testing BVH and TLAS and benchmarks
         #[cfg(feature = "camera")]
         app.add_plugins(camera::BvhCameraPlugin);
     }
 }
 
-/// Helper to add BVH from a Mesh3d component with a marker component
+/// Marker to convert mesh3d's mesh to a bvh
+#[derive(Component)]
+pub struct SpawnMeshBvh;
+
+/// add MeshBvh component to Mesh3d entities that have SpawnMeshBvh
 fn spawn_mesh_bvh(
     mut commands: Commands,
     meshes: Res<Assets<Mesh>>,
@@ -84,7 +91,11 @@ fn spawn_mesh_bvh(
     }
 }
 
-/// Helper to MeshBvh to any Mesh3d in a SceneRoot component with a marker component
+/// Added to SceneRoot to add Bvhs from Meshes in scene
+#[derive(Component)]
+pub struct SpawnSceneBvhs;
+
+/// add MeshBvh components to all Mesh3d children of SceneRoot
 fn spawn_scene_bvhs(
     mut commands: Commands,
     meshes: Res<Assets<Mesh>>,
@@ -120,11 +131,12 @@ fn spawn_scene_bvhs(
     }
 }
 
+/// Builds the TLAS from the MeshBvh components in the scene
+/// Should not be called every frame, but for now it for debugging purposes
 pub fn build_tlas(
     mut tlas: ResMut<Tlas>,
     query: Query<(Entity, &MeshBvh, &GlobalTransform)>,
     bvhs: Res<Assets<Bvh>>,
-    //#[cfg(feature = "debug_draw")] mut gizmos: Gizmos,
 ) {
     let count = query.iter().count();
     let mut node_index = vec![0u32; count + 1];
@@ -138,29 +150,31 @@ pub fn build_tlas(
     // fill the tlas all the leaf nodes
     for (i, (e, b, global_trans)) in query.iter().enumerate() {
         let bvh = bvhs.get(&b.0).expect("Bvh not found");
-        
-        let aabb = bvh.nodes[0]
-            .aabb
-            .clone()
-            .transformed_by(global_trans.translation(), global_trans.rotation());
-        //let inv_trans = global_trans.affine().inverse();
-        // calculate world-space aabb using global transform
-        //let mut aabb = Aabb3d::init();
-        // for i in 0..8 {
-        //     let corner = vec3a(
-        //         if i & 1 != 0 { local_aabb.max.x } else { local_aabb.min.x },
-        //         if i & 2 != 0 { local_aabb.max.y } else { local_aabb.min.y },
-        //         if i & 4 != 0 { local_aabb.max.z } else { local_aabb.min.z },
-        //     );
-        //     let world_corner = global_trans.affine().transform_point3a(corner);
-        //     aabb.expand(world_corner);
-        // }
-        //#[cfg(feature = "debug_draw")]
-        //gizmos.cuboid(aabb3d_global(&aabb), tailwind::GREEN_500);
+                
+        // convert the AABB to world space
+        let local_aabb = bvh.nodes[0].aabb.clone(); // root node AABB
+
+        // This would be ideal, but the scale only works if the aabb is centered local space, saidly not always the case
+        // let world_aabb = local_aabb
+        //     .scale_around_center(global_trans.scale())
+        //     .transformed_by(global_trans.translation(), global_trans.rotation());  
+
+        // instead we will project the corners of the local AABB to world space
+        let mut world_aabb = Aabb3d::init();
+        for i in 0..8 {
+            let corner = Vec3A::new(
+                if i & 1 == 0 { local_aabb.min.x } else { local_aabb.max.x },
+                if i & 2 == 0 { local_aabb.min.y } else { local_aabb.max.y },
+                if i & 4 == 0 { local_aabb.min.z } else { local_aabb.max.z },
+            );
+
+            let world_pos = global_trans.affine().transform_point3a(corner);
+            world_aabb.expand(world_pos);
+        }
 
         node_index[i] = i as u32 + 1;
         tlas.tlas_nodes.push(TlasNode {
-            aabb,
+            aabb: world_aabb,
             node_type: TNType::Leaf(e),
         });
     }
@@ -178,7 +192,8 @@ pub fn build_tlas(
             tlas.tlas_nodes.push(TlasNode {
                 aabb: node_a.aabb.merge(&node_b.aabb),
                 node_type: TNType::Branch {
-                    left_right: node_index_a + (node_index_b << 16),
+                    left: node_index_a as u16,
+                    right: node_index_b as u16,
                 },
             });
             node_index[a as usize] = tlas.tlas_nodes.len() as u32 - 1;
@@ -193,11 +208,4 @@ pub fn build_tlas(
     tlas.tlas_nodes[0] = tlas.tlas_nodes[node_index[a as usize] as usize];
 }
 
-// Added to Entity with Mesh3d to enable parsing once mesh is loaded, will be removed after parsing
-#[derive(Component)]
-pub struct SpawnMeshBvh;
-#[derive(Component)]
 
-/// Added to SceneRoot to enable parsing scene once loaded, will be removed after parsing
-#[require(SceneRoot)]
-pub struct SpawnSceneBvhs;

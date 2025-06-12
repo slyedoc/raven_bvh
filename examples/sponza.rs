@@ -5,7 +5,8 @@ use bevy::prelude::*;
 use raven_bvh::prelude::*;
 use crate::helpers::camera_free::CameraFree;
 
-/// Example using [`BvhScene`] for a scene load, this is pushing the limits of this example but it works
+/// This is by far the worse performing example, far more triangles than the others
+
 fn main() {
     App::new()
         .add_plugins((

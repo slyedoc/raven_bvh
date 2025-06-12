@@ -15,16 +15,21 @@ impl Plugin for HelperPlugin {
             camera_free::CameraFreePlugin, // camera movement
             exit::ExitPlugin,
         ))
-        .add_systems(Update, toggle_debug);
+        .add_systems(Update, cycle_debug);
     }
 }
 
-fn toggle_debug(
+fn cycle_debug(
     //mut commands: Commands,
-    mut debug: ResMut<BvhDebug>,
+    mut debug_mode: ResMut<BvhDebugMode>,
     input: Res<ButtonInput<KeyCode>>,
 ) {
     if input.just_pressed(KeyCode::Space) {
-        debug.enabled = !debug.enabled;
+        *debug_mode = match *debug_mode {
+            BvhDebugMode::Disabled => BvhDebugMode::Bvhs,
+            BvhDebugMode::Bvhs => BvhDebugMode::Tlas,
+            BvhDebugMode::Tlas => BvhDebugMode::Disabled,
+        };
+        info!("Debug mode: {:?}", *debug_mode.as_ref());
     }
 }

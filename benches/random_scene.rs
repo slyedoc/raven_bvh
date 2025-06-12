@@ -9,7 +9,7 @@ use std::{
 };
 
 use bevy::{prelude::*, render::mesh::MeshPlugin};
-use image::{ImageBuffer, Rgb, RgbImage};
+use image::{ImageBuffer, Rgb};
 use rand::prelude::*;
 use rand_chacha::{ChaChaRng, rand_core::SeedableRng};
 use raven_bvh::prelude::*;
@@ -67,8 +67,6 @@ fn scene_100k_1024() {
     );
 }
 
-
-
 #[bench]
 fn random_scene_1k_256(b: &mut Bencher) {
     b.iter(|| {
@@ -107,9 +105,9 @@ pub fn random_scene_100k_256(b: &mut Bencher) {
 fn setup_app<const GROUP_COUNT: usize, const TRI_PER_GROUP: usize, const RESOLUTION: u32>()
 -> (App, Entity) {
     let mut app = App::new();
-    app.add_plugins((
+    app.add_plugins((        
         MinimalPlugins,
-        TransformPlugin,
+        TransformPlugin,        
         AssetPlugin::default(),
         ImagePlugin::default(),
         MeshPlugin,
@@ -126,10 +124,6 @@ fn setup_app<const GROUP_COUNT: usize, const TRI_PER_GROUP: usize, const RESOLUT
         .world_mut()
         .spawn((
             Camera3d::default(),
-            Camera {
-                hdr: true,
-                ..default()
-            },
             Transform {
                 translation: vec3(0.0, 40.0, 100.0),
                 rotation: Quat::from_axis_angle(Vec3::X, -PI / 6.0),
@@ -138,8 +132,6 @@ fn setup_app<const GROUP_COUNT: usize, const TRI_PER_GROUP: usize, const RESOLUT
             BvhCamera::new(RESOLUTION, RESOLUTION),
         ))
         .id();
-
-    // Run systems
 
     (app, camera_id)
 }

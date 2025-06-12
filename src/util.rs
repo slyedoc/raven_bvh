@@ -1,6 +1,5 @@
 use crate::{
-    bvh::Bvh,
-    tri::Tri,
+    bvh::{Bvh, Tri},    
 };
 use bevy::{
     math::bounding::RayCast3d,
@@ -13,9 +12,7 @@ pub struct Hit {
     pub distance: f32, // intersection distance along ray, often seen as t
     pub u: f32,        // barycentric coordinates of the intersection
     pub v: f32,
-    // We are using more bits here than in tutorial
-    pub tri_index: usize,
-    pub entity: Entity,
+    pub tri_index: usize,    
 }
 
 impl Default for Hit {
@@ -24,52 +21,50 @@ impl Default for Hit {
             distance: 1e30f32,
             u: Default::default(),
             v: Default::default(),
-            tri_index: Default::default(),
-            // TODO: Yes this isnt ideal, should be an option, will come back to this
-            entity: Entity::from_raw(0),
+            tri_index: Default::default(),                        
         }
     }
 }
 
-pub trait RayCast3dToSpace {
-    /// Converting ray into another space
-    fn to_space(&self, transform: &GlobalTransform) -> RayCast3d;
+pub trait RayCastExt {
+    /// Converting ray into another space, and how much the range was scaled by
+    fn to_local(&self, transform: &GlobalTransform) -> (RayCast3d, f32);
 
     /// Get the point at a given distance along the ray.    
     fn get_point(&self, distance: f32) -> Vec3A;
+
+    fn intersect_triangle(&self, tri: &Tri, tri_index: usize) -> Option<Hit>;
+
+    //fn intersect_tlas(&self, tlas: &Tlas) -> Option<Hit>;
+
+    fn intersect_bvh(&self, bvh: &Bvh) -> Option<Hit>;
+
+    // fn intersect_bvh_instance(&self, bvh_instance: &BvhInstance, bvhs: &[Bvh]) -> Option<Hit>;
 }
 
-impl RayCast3dToSpace for RayCast3d {
-    // TODO: figured this be built in to bevy
+impl RayCastExt for RayCast3d {
     #[inline]
-    fn to_space(&self, transform: &GlobalTransform) -> RayCast3d {
-        let world_to = transform.affine().inverse();
-        RayCast3d::new(
-            world_to.transform_point3a(self.origin),
-            Dir3A::new(world_to.transform_vector3a(self.direction.as_vec3a())).unwrap(),
-            self.max,
-        )
+    fn to_local(&self, transform: &GlobalTransform) -> (RayCast3d, f32) {
+        let to_local = transform.affine().inverse();
+        let local_origin = to_local.transform_point3a(self.origin);
+        let local_dir = to_local.transform_vector3a(self.direction.as_vec3a());
+        // Compute how much the direction vector changed length
+        let dir_scale = local_dir.length() / self.direction.as_vec3a().length();
+
+        (RayCast3d::new(
+            local_origin,
+            Dir3A::new(local_dir).unwrap(),
+            self.max * dir_scale
+        ), dir_scale)
     }
 
     #[inline]
     fn get_point(&self, distance: f32) -> Vec3A {
         self.origin + *self.direction * distance
     }
-}
 
-pub trait RayCastExt {
-    fn intersect_triangle(&self, tri: &Tri, tri_index: usize, entity: Entity) -> Option<Hit>;
-
-    //fn intersect_tlas(&self, tlas: &Tlas) -> Option<Hit>;
-
-    fn intersect_bvh(&self, bvh: &Bvh, entity: Entity) -> Option<Hit>;
-
-    // fn intersect_bvh_instance(&self, bvh_instance: &BvhInstance, bvhs: &[Bvh]) -> Option<Hit>;
-}
-
-impl RayCastExt for RayCast3d {
     #[inline(always)]
-    fn intersect_triangle(&self, tri: &Tri, tri_index: usize, entity: Entity) -> Option<Hit> {
+    fn intersect_triangle(&self, tri: &Tri, tri_index: usize) -> Option<Hit> {
         #[cfg(feature = "trace")]
         let _span = info_span!("intersect_triangle").entered();
         let edge1 = tri.vertex1 - tri.vertex0;
@@ -99,34 +94,13 @@ impl RayCastExt for RayCast3d {
                 distance: t,
                 u,
                 v,
-                tri_index,
-                entity,
-            });
-            // TODO: The option part here feels sloppy
-            // if let Some(hit) = self.hit {
-            //     if t < hit.distance {
-            //         self.hit = Some(Hit {
-            //             distance: t,
-            //             u,
-            //             v,
-            //             tri_index,
-            //             entity,
-            //         });
-            //     }
-            // } else {
-            //     self.hit = Some(Hit {
-            //         distance: t,
-            //         u,
-            //         v,
-            //         tri_index,
-            //         entity,
-            //     });
-            // }
+                tri_index,                
+            });            
         }
         None
     }
 
-    fn intersect_bvh(&self, bvh: &Bvh, entity: Entity) -> Option<Hit> {
+    fn intersect_bvh(&self, bvh: &Bvh) -> Option<Hit> {
         #[cfg(feature = "trace")]
         let _span = info_span!("intersect_bvh").entered();
         let mut node = &bvh.nodes[0];
@@ -142,7 +116,7 @@ impl RayCastExt for RayCast3d {
                 for i in 0..node.tri_count {
                     let tri_index = bvh.triangle_indexs[(node.left_first + i) as usize];
                     if let Some(hit) =
-                        ray.intersect_triangle(&bvh.tris[tri_index], tri_index, entity)
+                        ray.intersect_triangle(&bvh.tris[tri_index], tri_index)
                     {
                         if let Some(best) = best_hit {
                             if hit.distance < best.distance {
@@ -187,62 +161,4 @@ impl RayCastExt for RayCast3d {
         }
         best_hit
     }    
-
-    // fn intersect_tlas(&self, tlas: &Tlas) -> Option<Hit> {
-    //     // PERF: clone the ray so we can update max distance as we find hits to tighten our search,
-    //     // more complex the scene the bigger the performance win
-    //     let mut ray = self.clone();
-
-    //     if tlas.tlas_nodes.is_empty() || tlas.blas.is_empty() {
-    //         return None;
-    //     }
-    //     let mut stack = Vec::<&TlasNode>::with_capacity(64);
-    //     let mut node = &tlas.tlas_nodes[0];
-    //     let mut best_hit: Option<Hit> = None;
-
-    //     loop {
-    //         if node.is_leaf() {
-    //             if let Some(hit) =
-    //                 ray.intersect_bvh_instance(&tlas.blas[node.blas as usize], &tlas.bvhs)
-    //             {
-    //                 if let Some(best) = best_hit {
-    //                     if hit.distance < best.distance {
-    //                         best_hit = Some(hit);
-    //                         ray.max = hit.distance; // tighten the ray
-    //                     }
-    //                 } else {
-    //                     best_hit = Some(hit);
-    //                     ray.max = hit.distance; // tighten the ray
-    //                 }
-    //             }
-    //             if stack.is_empty() {
-    //                 break;
-    //             } else {
-    //                 node = stack.pop().unwrap();
-    //             }
-    //             continue;
-    //         }
-    //         let mut child1 = &tlas.tlas_nodes[(node.left_right & 0xffff) as usize];
-    //         let mut child2 = &tlas.tlas_nodes[(node.left_right >> 16) as usize];
-    //         let mut dist1 = ray.aabb_intersection_at(&child1.aabb);
-    //         let mut dist2 = ray.aabb_intersection_at(&child2.aabb);
-    //         if dist1.unwrap_or(f32::MAX) > dist2.unwrap_or(f32::MAX) {
-    //             swap(&mut dist1, &mut dist2);
-    //             swap(&mut child1, &mut child2);
-    //         }
-    //         if dist1.is_none() {
-    //             if stack.is_empty() {
-    //                 break;
-    //             } else {
-    //                 node = stack.pop().unwrap();
-    //             }
-    //         } else {
-    //             node = child1;
-    //             if dist2.is_some() {
-    //                 stack.push(child2);
-    //             }
-    //         }
-    //     }
-    //     best_hit
-    // }
 }
