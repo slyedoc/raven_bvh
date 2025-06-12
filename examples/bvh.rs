@@ -70,6 +70,7 @@ fn setup(
         ..default()
     });
 
+    // Move a few the boxes around 
     for i in 0..10 {
         commands.spawn((
             Name::new(format!("Box {}", i)),
@@ -114,6 +115,7 @@ fn ray_cast(
         if let Some(mut hit) = local_ray.intersect_bvh(&bvh) {
             // Scale the distance back to world space
             hit.distance /= dir_scale;
+            // Test vs best hit so far
             if let Some(best) = best_hit {
                 if hit.distance < best.distance {
                     best_hit = Some(hit);

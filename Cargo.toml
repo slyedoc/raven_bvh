@@ -79,13 +79,13 @@ required-features = []
 
 [[example]]
 name = "tlas"
-required-features = ["camera", "helpers", "tlas"]
+required-features = ["camera", "helpers", "debug_draw"]
 
 [[example]]
 name = "sponza"
-required-features = ["camera", "helpers", "tlas"]
+required-features = ["camera", "helpers", "debug_draw"]
 
 [[example]]
 name = "clock_tower"
-required-features = ["camera", "helpers", "tlas"]
+required-features = ["camera", "helpers", "debug_draw"]
 
