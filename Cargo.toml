@@ -33,10 +33,11 @@ inherits = "dev"
 
 [features]
 default = []
-debug_draw = []
-camera = []
-trace = []
-save = [] # to test benchmark output
+helpers = [] # Adds SpawnMeshBvh and SpawnSceneBvh
+tlas = [] # Adds Tlas based on all MeshBvh
+camera = ["tlas"] # Adds BvhCamera for debugging
+debug_draw = [] # Enables Drawings Bvh and Tlas
+trace = [] # Enables a few spans
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -63,23 +64,28 @@ image = "0.25"
 
 [[bench]]
 name = "random_scene"
-required-features = ["camera"]
+required-features = ["camera", "helpers", "tlas"]
 harness = true
 
 [[bench]]
 name = "common"
-required-features = ["camera"]
+required-features = ["camera", "helpers", "tlas"]
 harness = true
 
+
 [[example]]
-name = "main"
-required-features = ["camera"]
+name = "bvh"
+required-features = []
+
+[[example]]
+name = "tlas"
+required-features = ["camera", "helpers", "tlas"]
 
 [[example]]
 name = "sponza"
-required-features = ["camera"]
+required-features = ["camera", "helpers", "tlas"]
 
 [[example]]
 name = "clock_tower"
-required-features = ["camera"]
+required-features = ["camera", "helpers", "tlas"]
 

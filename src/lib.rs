@@ -15,9 +15,13 @@ mod util;
 use bvh::*;
 #[cfg(feature = "camera")]
 mod camera;
+#[cfg(feature = "tlas")]
 mod tlas;
-use tlas::*;
+
 mod debug;
+
+#[cfg(feature = "tlas")]
+use tlas::*;
 
 use crate::{aabb::Aabb3dExt, debug::BvhDebugMode};
 
@@ -29,8 +33,14 @@ pub mod prelude {
     #[cfg(feature = "camera")]
     pub use crate::camera::*;
     pub use crate::{
-        BvhPlugin, BvhSystems, SpawnMeshBvh, SpawnSceneBvhs, bvh::*, debug::*, tlas::*, util::*,
+        BvhPlugin, BvhSystems, bvh::*, debug::*, util::*,
     };
+
+    #[cfg(feature = "tlas")]
+    pub use crate::tlas::*;
+
+    #[cfg(feature = "helpers")]
+    pub use crate::{ SpawnMeshBvh, SpawnSceneBvhs};
 }
 
 const BIN_COUNT: usize = 8;
@@ -46,23 +56,31 @@ pub struct BvhPlugin;
 
 impl Plugin for BvhPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<Tlas>()
+        app
             .init_resource::<BvhDebugMode>()
-            .init_asset::<Bvh>()
+            .init_asset::<Bvh>();
+
+        #[cfg(feature = "helpers")]
+        app.add_systems(
+            PostUpdate,
+            (
+                // Helpers to spawn BVH from Mesh3d and SceneRoot
+                spawn_mesh_bvh,
+                spawn_scene_bvhs,           
+            )
+                .chain()
+                .before(BvhSystems::Update)                    
+        );
+
+        #[cfg(feature = "tlas")]
+        app
+            .init_resource::<Tlas>()
             .add_systems(
                 PostUpdate,
-                (
-                    // Helpers to spawn BVH from Mesh3d and SceneRoot
-                    spawn_mesh_bvh,
-                    spawn_scene_bvhs,
-                    // build the tlas, shouldn't need full rebuild every frame, see refit, for now it is
-                    build_tlas,
-                )
-                    .chain()
-                    .in_set(BvhSystems::Update)
+                    build_tlas.in_set(BvhSystems::Update)
                     .after(TransformSystem::TransformPropagate),
             );
-
+        
         #[cfg(feature = "debug_draw")]
         app.add_systems(PostUpdate, debug::debug_gimos.after(BvhSystems::Update));
 
@@ -73,10 +91,12 @@ impl Plugin for BvhPlugin {
 }
 
 /// Marker to convert mesh3d's mesh to a bvh
+#[cfg(feature = "helpers")]
 #[derive(Component)]
 pub struct SpawnMeshBvh;
 
 /// add MeshBvh component to Mesh3d entities that have SpawnMeshBvh
+#[cfg(feature = "helpers")]
 fn spawn_mesh_bvh(
     mut commands: Commands,
     meshes: Res<Assets<Mesh>>,
@@ -94,10 +114,12 @@ fn spawn_mesh_bvh(
 }
 
 /// Added to SceneRoot to add Bvhs from Meshes in scene
+#[cfg(feature = "helpers")]
 #[derive(Component)]
 pub struct SpawnSceneBvhs;
 
 /// add MeshBvh components to all Mesh3d children of SceneRoot
+#[cfg(feature = "helpers")]
 fn spawn_scene_bvhs(
     mut commands: Commands,
     meshes: Res<Assets<Mesh>>,
@@ -135,6 +157,7 @@ fn spawn_scene_bvhs(
 
 /// Builds the TLAS from the MeshBvh components in the scene
 /// Should not be called every frame, but for now it for debugging purposes
+#[cfg(feature = "tlas")]
 pub fn build_tlas(
     mut tlas: ResMut<Tlas>,
     query: Query<(Entity, &MeshBvh, &GlobalTransform)>,

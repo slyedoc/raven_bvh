@@ -6,10 +6,8 @@ use raven_bvh::prelude::*;
 
 use crate::helpers::camera_free::CameraFree;
 
-// !!!!!!!!!!
-// TODO: This is broken, we dont scale distnce at some point
+// Example using SpawnSceneBvhs for oddly scaled gltf
 
-// Example using BvhInitWithChildren for a scene load
 fn main() {
     App::new()
         .add_plugins((DefaultPlugins, HelperPlugin, BvhPlugin))
@@ -55,7 +53,8 @@ fn setup(
         SpawnMeshBvh, // This Marker will have our mesh added
     ));
 
-    /// This is to test when our Transform has odd scaling
+    
+    // Clock Tower
     commands.spawn((
         Name::new("Clock Tower"),
         Transform::from_xyz(0.0, 4.0, -10.0).with_scale(Vec3::splat(0.001)), // scale it to miniture size

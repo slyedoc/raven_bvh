@@ -25,11 +25,22 @@ fn cycle_debug(
     input: Res<ButtonInput<KeyCode>>,
 ) {
     if input.just_pressed(KeyCode::Space) {
-        *debug_mode = match *debug_mode {
+        #[cfg(not(feature = "tlas"))]
+        {
+            *debug_mode = match *debug_mode {
+                BvhDebugMode::Disabled => BvhDebugMode::Bvhs,
+                BvhDebugMode::Bvhs => BvhDebugMode::Disabled,
+            };
+        };
+        #[cfg(feature = "tlas")]
+        {
+            *debug_mode = match *debug_mode {
             BvhDebugMode::Disabled => BvhDebugMode::Bvhs,
             BvhDebugMode::Bvhs => BvhDebugMode::Tlas,
             BvhDebugMode::Tlas => BvhDebugMode::Disabled,
-        };
+            };
+        }
+        
         info!("Debug mode: {:?}", *debug_mode.as_ref());
     }
 }

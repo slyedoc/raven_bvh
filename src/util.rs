@@ -4,7 +4,7 @@ use std::mem::swap;
 
 #[derive(Debug, Clone, Copy)]
 pub struct Hit {
-    pub distance: f32, // intersection distance along ray, often seen as t
+    pub distance: f32, // intersection distance along ray
     pub u: f32,        // barycentric coordinates of the intersection
     pub v: f32,
     pub tri_index: usize,
@@ -25,37 +25,41 @@ pub trait RayCastExt {
     /// Converting ray into another space, and how much the range was scaled by
     fn to_local(&self, transform: &GlobalTransform) -> (RayCast3d, f32);
 
-    // /// Get the point at a given distance along the ray.
-    // fn get_point(&self, distance: f32) -> Vec3A;
-
+    fn get_point(&self, distance: f32) -> Vec3A;
+    
+    /// Intersect a triangle with the ray, returning the hit information if it intersects
     fn intersect_triangle(&self, tri: &Tri, tri_index: usize) -> Option<Hit>;
 
+    /// Intersect the ray with a BVH, returning the closest hit if any
     fn intersect_bvh(&self, bvh: &Bvh) -> Option<Hit>;
 }
 
 impl RayCastExt for RayCast3d {
+
+
+    /// Get a point at a given distance along the ray
+    #[inline]
+    fn get_point(&self, distance: f32) -> Vec3A {
+        self.origin + self.direction.as_vec3a() * distance
+    }
+
     #[inline]
     fn to_local(&self, transform: &GlobalTransform) -> (RayCast3d, f32) {
         let to_local = transform.affine().inverse();
         let local_origin = to_local.transform_point3a(self.origin);
         let local_dir = to_local.transform_vector3a(self.direction.as_vec3a());
         // Compute how much the direction vector changed length
-        let dir_scale = local_dir.length() / self.direction.as_vec3a().length();
-
+        let dir_scale = local_dir.length() / self.direction.as_vec3a().length();        
         (
             RayCast3d::new(
                 local_origin,
+                // Safety: local_dir should not be zero, as it is derived from a valid ray
                 Dir3A::new(local_dir).unwrap(),
                 self.max * dir_scale,
             ),
             dir_scale,
         )
     }
-
-    // #[inline]
-    // fn get_point(&self, distance: f32) -> Vec3A {
-    //     self.origin + *self.direction * distance
-    // }
 
     #[inline(always)]
     fn intersect_triangle(&self, tri: &Tri, tri_index: usize) -> Option<Hit> {

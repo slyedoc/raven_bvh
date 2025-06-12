@@ -6,7 +6,7 @@ use bevy::{
 #[cfg(feature = "debug_draw")]
 use crate::{
     bvh::{Bvh, MeshBvh},
-    tlas::Tlas,
+
 };
 
 pub fn aabb3d_global(bounding: &Aabb3d) -> GlobalTransform {
@@ -29,16 +29,18 @@ pub enum BvhDebugMode {
     #[default]
     Disabled,
     Bvhs,
+    #[cfg(feature = "tlas")]
     Tlas,
 }
 
 #[cfg(feature = "debug_draw")]
 pub fn debug_gimos(
-    mut _tlas: ResMut<Tlas>,
+    
     query: Query<(&MeshBvh, &GlobalTransform)>,
     bvhs: Res<Assets<Bvh>>,
     mut gizmos: Gizmos,
     bvh_debug: Res<BvhDebugMode>,
+    #[cfg(feature = "tlas")] mut tlas: ResMut<crate::tlas::Tlas>,
 ) {
     use bevy::color::palettes::tailwind;
 
@@ -58,8 +60,9 @@ pub fn debug_gimos(
                 }
             }
         }
+        #[cfg(feature = "tlas")]
         BvhDebugMode::Tlas => {
-            for node in _tlas.tlas_nodes.iter() {
+            for node in tlas.tlas_nodes.iter() {
                 let color = if node.is_leaf() {
                     tailwind::GREEN_500
                 } else {
