@@ -162,7 +162,7 @@ pub fn camera_ui(mut commands: Commands, camera: Query<&BvhCamera, Added<BvhCame
                             ..default()
                         }
                     ),
-                    (Text::new(ray_text)),
+                    Text::new(ray_text),
                 ],
             ));
         }
