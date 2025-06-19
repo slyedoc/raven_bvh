@@ -19,12 +19,7 @@ pub(crate) fn spawn_bvh(
     for (e, handle) in query.iter() {
         let mesh = meshes.get(handle).expect("Mesh not found");
         let bvh = bvhs.add(Bvh::from(mesh));
-        commands
-            .entity(e)
-            .insert(
-                MeshBvh(bvh)
-            )
-            .remove::<SpawnBvh>();
+        commands.entity(e).insert(MeshBvh(bvh)).remove::<SpawnBvh>();
     }
 }
 
@@ -43,10 +38,7 @@ pub(crate) fn spawn_bvh_for_tlas(
         let bvh = bvhs.add(Bvh::from(mesh));
         commands
             .entity(e)
-            .insert((
-                TlasTarget(spawn.0),
-                MeshBvh(bvh)
-            ))
+            .insert((TlasTarget(spawn.0), MeshBvh(bvh)))
             .remove::<SpawnBvhForTlas>();
     }
 }
@@ -82,15 +74,11 @@ pub(crate) fn spawn_scene_bvh_for_tlas(
                 }
             }
             if let Some(h_mesh) = opt_mesh {
-
-
                 let mesh = meshes.get(h_mesh).expect("Mesh not found");
                 let bvh = bvhs.add(Bvh::from(mesh));
-                commands.entity(e)
-                    .insert((
-                        MeshBvh(bvh),
-                        TlasTarget(spawn.0)
-                    ));
+                commands
+                    .entity(e)
+                    .insert((MeshBvh(bvh), TlasTarget(spawn.0)));
             }
         }
 

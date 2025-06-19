@@ -61,11 +61,11 @@ pub struct Bvh {
 }
 
 impl From<&Mesh> for Bvh {
-    fn from(mesh: &Mesh) -> Self {          
+    fn from(mesh: &Mesh) -> Self {
         assert!(
             matches!(mesh.primitive_topology(), PrimitiveTopology::TriangleList),
             "`Bvh::from` can only work on `TriangleList`s"
-        );        
+        );
 
         let verts = match mesh
             .attribute(Mesh::ATTRIBUTE_POSITION)
@@ -87,7 +87,7 @@ impl From<&Mesh> for Bvh {
                 };
 
                 let mut triangles = Vec::with_capacity(indexes.len() / 3);
-                for tri_indexes in indexes.chunks(3) {                    
+                for tri_indexes in indexes.chunks(3) {
                     triangles.push(Tri::new(
                         verts[tri_indexes[0]],
                         verts[tri_indexes[1]],
@@ -95,15 +95,14 @@ impl From<&Mesh> for Bvh {
                     ));
                 }
                 triangles
-            },
+            }
             None => {
                 let mut triangles = Vec::with_capacity(verts.len() / 3);
                 for v in verts.chunks(3) {
                     triangles.push(Tri::new(v[0], v[1], v[2]));
                 }
                 triangles
-
-            },
+            }
         };
         Self::new(triangles)
     }

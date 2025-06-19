@@ -26,10 +26,7 @@ fn setup(
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
     // add tlas for camera
-    let tlas_id = commands.spawn((
-        Name::new("TLAS"),
-        Tlas::default(),
-    )).id();
+    let tlas = commands.spawn((Name::new("Tlas"), Tlas::default())).id();
 
     // camera
     commands.spawn((
@@ -41,7 +38,7 @@ fn setup(
             ..default()
         },
         Transform::from_xyz(0.0, 2.0, 5.0).looking_at(Vec3::ZERO, Vec3::Y),
-        BvhCamera::new(256, 512, tlas_id),
+        BvhCamera::new(256, 512, tlas),
     ));
 
     // light
@@ -58,7 +55,7 @@ fn setup(
         MeshMaterial3d(materials.add(StandardMaterial {
             base_color: tailwind::GREEN_900.into(),
             ..default()
-        })),        
+        })),
         SpawnBvhForTlas(tlas_id), // This Marker will have our mesh added
     ));
 
@@ -129,10 +126,7 @@ fn spawn_circle(
     ))
 }
 
-fn rotate_boxes(
-    time: Res<Time>,
-    mut query: Query<&mut Transform, With<Box>>,
-) {
+fn rotate_boxes(time: Res<Time>, mut query: Query<&mut Transform, With<Box>>) {
     for mut transform in query.iter_mut() {
         transform.rotate(Quat::from_rotation_y(time.delta_secs()));
     }

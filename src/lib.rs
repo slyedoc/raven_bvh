@@ -4,12 +4,15 @@
 #[allow(unused_imports)]
 #[cfg(feature = "debug_draw")]
 use bevy::color::palettes::tailwind;
-use bevy::{math::bounding::{Aabb3d, BoundingVolume}, prelude::*};
+use bevy::{
+    math::bounding::{Aabb3d, BoundingVolume},
+    prelude::*,
+};
 
 mod aabb;
 mod bvh;
-mod util;
 mod helpers;
+mod util;
 use bvh::*;
 #[cfg(feature = "camera")]
 mod camera;
@@ -24,11 +27,10 @@ use crate::{aabb::Aabb3dExt, debug::BvhDebugMode, tlas::*};
 use crate::debug::*;
 
 pub mod prelude {
-    pub use crate::{BvhPlugin, BvhSystems, bvh::*, debug::*, util::*, helpers::*, tlas::*};
-    
+    pub use crate::{BvhPlugin, BvhSystems, bvh::*, debug::*, helpers::*, tlas::*, util::*};
+
     #[cfg(feature = "camera")]
     pub use crate::camera::*;
-    
 }
 
 const BIN_COUNT: usize = 8;
@@ -44,10 +46,8 @@ pub struct BvhPlugin;
 
 impl Plugin for BvhPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<BvhDebugMode>()
-        .init_asset::<Bvh>();
+        app.init_resource::<BvhDebugMode>().init_asset::<Bvh>();
 
-        
         app.add_systems(
             PostUpdate,
             (
@@ -56,9 +56,9 @@ impl Plugin for BvhPlugin {
                 helpers::spawn_bvh_for_tlas,
                 helpers::spawn_scene_bvh_for_tlas,
             )
-            .before(BvhSystems::Update),
+                .before(BvhSystems::Update),
         );
-        
+
         app.add_systems(
             PostUpdate,
             build_tlas
@@ -67,7 +67,7 @@ impl Plugin for BvhPlugin {
         )
         .register_type::<Tlas>()
         .register_type::<TlasSource>()
-        .register_type::<TlasRebuildStrategy>()        
+        .register_type::<TlasRebuildStrategy>()
         .register_type::<TlasNodeType>();
 
         #[cfg(feature = "debug_draw")]
@@ -94,7 +94,7 @@ pub fn build_tlas(
         // clear the tlas
         tlas.tlas_nodes.clear();
 
-        let count = children.collection().len();        
+        let count = children.collection().len();
         if count == 0 {
             // if there are no children, we will not build the tlas
             continue;
@@ -102,7 +102,7 @@ pub fn build_tlas(
 
         // reserve a root node as 0
         tlas.tlas_nodes.push(TlasNode::default());
-        
+
         // fill the tlas all the leaf nodes
         for e in children.iter() {
             let (e, b, global_trans) = query.get(e).unwrap();
@@ -181,7 +181,6 @@ pub fn build_tlas(
             }
         }
         tlas.tlas_nodes[0] = tlas.tlas_nodes[node_index[a as usize] as usize];
-
 
         // if in manual mode clear the flag
         if let TlasRebuildStrategy::Mannual(true) = *strat {

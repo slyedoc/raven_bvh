@@ -1,6 +1,6 @@
 use crate::BvhSystems;
 
-use crate::tlas::{TlasCast};
+use crate::tlas::TlasCast;
 
 use bevy::{
     asset::RenderAssetUsages,
@@ -113,7 +113,9 @@ pub fn render_camera(
                             RayCast3d::new(origin, Dir3A::new(direction.into()).unwrap(), 1e30f32);
 
                         // intersect the ray with the TLAS
-                        let color = if let Some((_e, hit)) = tlas_cast.intersect_tlas(&ray, bvh_camera.tlas) {
+                        let color = if let Some((_e, hit)) =
+                            tlas_cast.intersect_tlas(&ray, bvh_camera.tlas)
+                        {
                             vec3(hit.u, hit.v, 1.0 - (hit.u + hit.v)) * 255.0
                         } else {
                             Vec3::ZERO

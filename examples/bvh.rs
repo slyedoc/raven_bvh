@@ -56,12 +56,12 @@ fn setup(
         Name::new("Ground"),
         Transform::from_xyz(0.0, 0.0, 0.0),
         Mesh3d(meshes.add(ground_mesh)),
-        MeshBvh(bvhs.add(ground_bvh)),  /// Adding the bvh to the entity
+        MeshBvh(bvhs.add(ground_bvh)),
+        /// Adding the bvh to the entity
         MeshMaterial3d(materials.add(StandardMaterial {
             base_color: tailwind::GREEN_900.into(),
             ..default()
         })),
-        
     ));
 
     // Like other assets, the same bvh can be uses on multiple entities
@@ -74,10 +74,10 @@ fn setup(
         ..default()
     });
 
-    // Move a few the boxes around 
+    // Move a few the boxes around
     let mut x_pos = 0.0;
-    for i in 0u32..10u32 {        
-        let scale = (i + 1).pow(2) as f32 ;        
+    for i in 0u32..10u32 {
+        let scale = (i + 1).pow(2) as f32;
         let half_scale = scale / 2.0;
         x_pos += scale * 1.1;
         commands.spawn((
@@ -90,7 +90,6 @@ fn setup(
             MeshBvh(box_bvh_handle.clone()),
             MeshMaterial3d(mat.clone()),
         ));
-        
     }
 }
 
@@ -146,11 +145,7 @@ fn ray_cast(
     }
 }
 
-
-fn rotate_boxes(
-    time: Res<Time>,
-    mut query: Query<&mut Transform, With<Box>>,
-) {
+fn rotate_boxes(time: Res<Time>, mut query: Query<&mut Transform, With<Box>>) {
     for mut transform in query.iter_mut() {
         transform.rotate(Quat::from_rotation_y(time.delta_secs()));
     }

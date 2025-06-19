@@ -21,10 +21,7 @@ fn setup(
     asset_server: Res<AssetServer>,
 ) {
     // add tlas for camera
-    let tlas = commands.spawn((
-        Name::new("Tlas"),
-        Tlas::default(),
-    )).id();
+    let tlas = commands.spawn((Name::new("Tlas"), Tlas::default())).id();
 
     // camera
     commands.spawn((

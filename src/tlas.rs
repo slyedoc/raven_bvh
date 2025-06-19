@@ -55,7 +55,7 @@ impl TlasNode {
 #[derive(Debug, Default, Component, Reflect)]
 #[reflect(Component)]
 #[require(TlasSource, TlasRebuildStrategy)]
-pub struct Tlas {    
+pub struct Tlas {
     pub tlas_nodes: Vec<TlasNode>,
 }
 
@@ -63,16 +63,16 @@ pub struct Tlas {
 #[derive(Component, Default, Debug, Reflect)]
 #[relationship_target(relationship=TlasTarget)]
 pub struct TlasSource(Vec<Entity>);
-    
-/// Used to limit the number of tlas rebuilds, 
+
+/// Used to limit the number of tlas rebuilds,
 #[derive(Debug, Component, Default, Reflect)]
 #[reflect(Component)]
 pub enum TlasRebuildStrategy {
     #[default]
     Every, // rebuild every update
-    
-    // Note: will tlas becauses outdated 
-    Mannual(bool),  // if true, will be rebuilt flag to false
+
+    // Note: will tlas becauses outdated
+    Mannual(bool), // if true, will be rebuilt flag to false
 }
 
 /// Marker to add a Entity to the TLAS
@@ -102,7 +102,6 @@ impl Tlas {
 
 #[derive(SystemParam)]
 pub struct TlasCast<'w, 's> {
-    
     pub bvhs: Res<'w, Assets<Bvh>>,
     pub tlases: Query<'w, 's, Read<Tlas>>,
     pub query: Query<'w, 's, (Entity, Read<MeshBvh>, Read<GlobalTransform>)>,
@@ -111,19 +110,19 @@ pub struct TlasCast<'w, 's> {
 impl<'w, 's> TlasCast<'w, 's> {
     // if no tlas_e is provided, we will assume there is only one tlas in the scene
     pub fn intersect_tlas(&self, ray: &RayCast3d, tlas_e: Entity) -> Option<(Entity, Hit)> {
-        
         // PERF: clone the ray so we can update max distance as we find hits to tighten our search,
         // more complex the scene the bigger the performance win
         let mut ray = ray.clone();
-                
+
         let Ok(tlas) = self.tlases.get(tlas_e) else {
             return None;
         };
-        
-        // Search the TLAS for the best hit
+
         if tlas.tlas_nodes.is_empty() {
             return None;
         }
+
+        // Search the Tlas by traversing the tree
         let mut stack = Vec::<&TlasNode>::with_capacity(64);
         let mut node = &tlas.tlas_nodes[0];
         let mut best_hit: Option<Hit> = None;
@@ -132,24 +131,24 @@ impl<'w, 's> TlasCast<'w, 's> {
         loop {
             match node.node_type {
                 TlasNodeType::Leaf(e) => {
-                    let (_e, mesh_bvh, global_trans) = self.query.get(e).unwrap();
-                    // convert the ray to local space of the e
-                    let (local_ray, dir_scale) = ray.to_local(global_trans);
-
-                    // test vs bvh
-                    let bvh = self.bvhs.get(&mesh_bvh.0).unwrap();
-                    if let Some(mut hit) = local_ray.intersect_bvh(bvh) {
-                        hit.distance /= dir_scale; // Convert back to world-space distance                        
-                        if let Some(best) = best_hit {
-                            if hit.distance < best.distance {
+                    // test vs entity bvh if it has one
+                    if let Ok((_e, mesh_bvh, global_trans)) = self.query.get(e) {
+                        // convert the ray to local space of the e
+                        let (local_ray, dir_scale) = ray.to_local(global_trans);
+                        let bvh = self.bvhs.get(&mesh_bvh.0).unwrap();
+                        if let Some(mut hit) = local_ray.intersect_bvh(bvh) {
+                            hit.distance /= dir_scale; // Convert back to world-space distance                        
+                            if let Some(best) = best_hit {
+                                if hit.distance < best.distance {
+                                    best_hit = Some(hit);
+                                    best_entity = Some(e);
+                                    ray.max = hit.distance; // tighten the ray
+                                }
+                            } else {
                                 best_hit = Some(hit);
                                 best_entity = Some(e);
                                 ray.max = hit.distance; // tighten the ray
                             }
-                        } else {
-                            best_hit = Some(hit);
-                            best_entity = Some(e);
-                            ray.max = hit.distance; // tighten the ray
                         }
                     }
                     if let Some(n) = stack.pop() {

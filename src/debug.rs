@@ -19,8 +19,7 @@ pub(crate) fn aabb3d_global(bounding: &Aabb3d) -> GlobalTransform {
 
 #[allow(dead_code)]
 pub(crate) fn aabb3d_transform(bounding: &Aabb3d, transform: &GlobalTransform) -> GlobalTransform {
-    *transform
-        * aabb3d_global(bounding)
+    *transform * aabb3d_global(bounding)
 }
 
 #[derive(Resource, Default, Debug)]
@@ -32,9 +31,9 @@ pub enum BvhDebugMode {
 }
 
 #[cfg(feature = "debug_draw")]
-pub fn debug_gimos(    
-    query: Query<(&MeshBvh, &GlobalTransform)>,    
-    bvhs: Res<Assets<Bvh>>,    
+pub fn debug_gimos(
+    query: Query<(&MeshBvh, &GlobalTransform)>,
+    bvhs: Res<Assets<Bvh>>,
     bvh_debug: Res<BvhDebugMode>,
     tlases: Query<&Tlas>,
     mut gizmos: Gizmos,
@@ -56,7 +55,7 @@ pub fn debug_gimos(
                     gizmos.cuboid(aabb3d_transform(&node.aabb, global_trans), color);
                 }
             }
-        }        
+        }
         BvhDebugMode::Tlas => {
             for tlas in tlases.iter() {
                 for node in tlas.tlas_nodes.iter() {
@@ -67,7 +66,7 @@ pub fn debug_gimos(
                     };
                     gizmos.cuboid(aabb3d_global(&node.aabb), color);
                 }
-            }            
+            }
         }
     }
 

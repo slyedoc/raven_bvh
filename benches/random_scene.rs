@@ -46,7 +46,7 @@ fn scene_1k_1024() {
 #[test]
 fn scene_100k_1024() {
     let mut app = setup_app::<100, 1000, 1024>();
-    
+
     app.update();
 
     let image = get_image(app);
@@ -99,14 +99,12 @@ pub fn random_scene_100k_256(b: &mut Bencher) {
     });
 }
 
-
 #[derive(Resource)]
 struct TestEntities {
     pub camera: Entity,
 }
 
-fn setup_app<const GROUP_COUNT: usize, const TRI_PER_GROUP: usize, const RESOLUTION: u32>()
--> App {
+fn setup_app<const GROUP_COUNT: usize, const TRI_PER_GROUP: usize, const RESOLUTION: u32>() -> App {
     let mut app = App::new();
     app.add_plugins((
         MinimalPlugins,
@@ -165,7 +163,6 @@ fn setup_tri_scene<const GROUP_COUNT: usize, const TRI_PER_GROUP: usize, const R
         ))
         .id();
 
-
     let mut rng = ChaChaRng::seed_from_u64(0);
     let side_count = (GROUP_COUNT as f32).sqrt().ceil() as u32;
     let offset = 12.0;
@@ -186,17 +183,11 @@ fn setup_tri_scene<const GROUP_COUNT: usize, const TRI_PER_GROUP: usize, const R
         }
     }
 
-    commands.insert_resource(TestEntities {
-        camera,
-    });
+    commands.insert_resource(TestEntities { camera });
 }
 
-
-
 fn get_image(app: App) -> ImageBuffer<Rgb<u8>, Vec<u8>> {
-    let TestEntities { camera } = app
-        .world()
-        .resource::<TestEntities>();
+    let TestEntities { camera } = app.world().resource::<TestEntities>();
 
     let handle = app
         .world()

@@ -29,8 +29,8 @@ fn cycle_debug(
             BvhDebugMode::Disabled => BvhDebugMode::Bvhs,
             BvhDebugMode::Bvhs => BvhDebugMode::Tlas,
             BvhDebugMode::Tlas => BvhDebugMode::Disabled,
-            };
-        
+        };
+
         info!("Debug mode: {:?}", *debug_mode.as_ref());
     }
 }

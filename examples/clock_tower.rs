@@ -22,10 +22,7 @@ fn setup(
     asset_server: Res<AssetServer>,
 ) {
     // add tlas for camera
-    let tlas_id = commands.spawn((
-        Name::new("TLAS"),
-        Tlas::default(),
-    )).id();
+    let tlas_id = commands.spawn((Name::new("TLAS"), Tlas::default())).id();
 
     commands.spawn((
         Name::new("Main Camera"),
@@ -58,11 +55,10 @@ fn setup(
         })),
         SpawnBvh, // This will just create the bvh for the mesh
         TlasTarget(tlas_id), // Will make the tlas track this entity
-        // Could replace the last two components with for the same effect
-        // SpawnBvhForTlas(tlas_id), // This will just create the bvh for the mesh and add it to the tlas
+                  // Could replace the last two components with for the same effect
+                  // SpawnBvhForTlas(tlas_id), // This will just create the bvh for the mesh and add it to the tlas
     ));
 
-    
     // Clock Tower
     commands.spawn((
         Name::new("Clock Tower"),

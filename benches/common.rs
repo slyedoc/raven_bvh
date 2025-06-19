@@ -1,13 +1,12 @@
 use bevy::{color::palettes::tailwind, prelude::*, render::mesh::MeshPlugin};
 use raven_bvh::prelude::*;
 
-
 #[test]
 fn test_bvh_camera() {
     // Setup app
     let mut app = App::new();
 
-    app.add_plugins((        
+    app.add_plugins((
         MinimalPlugins,
         TransformPlugin,
         AssetPlugin::default(),
@@ -123,8 +122,8 @@ fn add_bvh_to_tlas(
     tlas: Query<Entity, With<Tlas>>,
     query: Query<Entity, With<MeshBvh>>,
 ) {
-
-    let tlas = tlas.single()
+    let tlas = tlas
+        .single()
         .expect("There should be only one Tlas in the scene");
 
     for e in query.iter() {
