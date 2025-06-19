@@ -1,12 +1,13 @@
 use bevy::{color::palettes::tailwind, prelude::*, render::mesh::MeshPlugin};
 use raven_bvh::prelude::*;
 
+
 #[test]
-fn camera() {
+fn test_bvh_camera() {
     // Setup app
     let mut app = App::new();
 
-    app.add_plugins((
+    app.add_plugins((        
         MinimalPlugins,
         TransformPlugin,
         AssetPlugin::default(),
@@ -15,31 +16,19 @@ fn camera() {
         //AssetPlugin::default(),
         BvhPlugin,
     ))
-    .add_systems(Startup, setup);
-
-    // Setup test entities
-    let camera_id = app
-        .world_mut()
-        .spawn((
-            Camera3d::default(),
-            Camera {
-                hdr: true,
-                ..default()
-            },
-            Transform::from_xyz(0.0, 2.0, 10.0).looking_at(Vec3::ZERO, Vec3::Y),
-            BvhCamera::new(256, 256),
-        ))
-        .id();
+    .add_systems(Startup, setup)
+    .add_systems(PostStartup, add_bvh_to_tlas);
 
     // Run systems
     app.update();
-    app.update();
+
+    let TestEntities { camera } = app.world().resource::<TestEntities>();
 
     // Check resulting changes
     let image = {
         let handle = app
             .world()
-            .get::<BvhCamera>(camera_id)
+            .get::<BvhCamera>(*camera)
             .expect("Camera image not found")
             .image
             .clone()
@@ -59,11 +48,31 @@ fn camera() {
     //assert_eq!(app.world().get::<Enemy>(enemy_id).unwrap().hit_points, 4);
 }
 
+#[derive(Resource)]
+struct TestEntities {
+    pub camera: Entity,
+}
+
 fn setup(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     //mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
+    // tlas
+    let tlas = commands.spawn(Tlas::default()).id();
+
+    let camera = commands
+        .spawn((
+            Camera3d::default(),
+            Camera {
+                hdr: true,
+                ..default()
+            },
+            Transform::from_xyz(0.0, 2.0, 10.0).looking_at(Vec3::ZERO, Vec3::Y),
+            BvhCamera::new(256, 256, tlas),
+        ))
+        .id();
+
     // light
     commands.spawn((
         DirectionalLight::default(),
@@ -79,7 +88,7 @@ fn setup(
         //     base_color: tailwind::GREEN_900.into(),
         //     ..default()
         // })),
-        SpawnMeshBvh, // This Marker will have our mesh added
+        SpawnBvhForTlas(tlas), // This Marker will have our mesh added
     ));
 
     //     commands.spawn((
@@ -101,7 +110,24 @@ fn setup(
             Name::new("Target"),
             Transform::from_translation(position),
             Mesh3d(meshes.add(Sphere { radius: size }.mesh())),
-            SpawnMeshBvh,
+            SpawnBvhForTlas(tlas),
         ));
+    }
+
+    commands.insert_resource(TestEntities { camera });
+}
+
+// add all the bvh to the tlas
+fn add_bvh_to_tlas(
+    mut commands: Commands,
+    tlas: Query<Entity, With<Tlas>>,
+    query: Query<Entity, With<MeshBvh>>,
+) {
+
+    let tlas = tlas.single()
+        .expect("There should be only one Tlas in the scene");
+
+    for e in query.iter() {
+        commands.entity(e).insert(TlasTarget(tlas));
     }
 }

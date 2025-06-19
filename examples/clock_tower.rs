@@ -21,6 +21,12 @@ fn setup(
     mut materials: ResMut<Assets<StandardMaterial>>,
     asset_server: Res<AssetServer>,
 ) {
+    // add tlas for camera
+    let tlas_id = commands.spawn((
+        Name::new("TLAS"),
+        Tlas::default(),
+    )).id();
+
     commands.spawn((
         Name::new("Main Camera"),
         CameraFree, // Helper to move the camera around with WASD and mouse look with right mouse button
@@ -30,7 +36,7 @@ fn setup(
             ..default()
         },
         Transform::from_xyz(0.0, 2.0, 5.0).looking_at(Vec3::ZERO, Vec3::Y),
-        BvhCamera::new(256, 256),
+        BvhCamera::new(256, 256, tlas_id),
     ));
 
     commands.spawn((
@@ -41,7 +47,7 @@ fn setup(
         Transform::from_rotation(Quat::from_euler(EulerRot::XYZ, -1.0, -0.5, 0.0)),
     ));
 
-    /// ground
+    // ground
     commands.spawn((
         Name::new("Ground"),
         Transform::from_xyz(0.0, 0.0, 0.0),
@@ -50,7 +56,10 @@ fn setup(
             base_color: tailwind::GREEN_900.into(),
             ..default()
         })),
-        SpawnMeshBvh, // This Marker will have our mesh added
+        SpawnBvh, // This will just create the bvh for the mesh
+        TlasTarget(tlas_id), // Will make the tlas track this entity
+        // Could replace the last two components with for the same effect
+        // SpawnBvhForTlas(tlas_id), // This will just create the bvh for the mesh and add it to the tlas
     ));
 
     
@@ -63,6 +72,6 @@ fn setup(
         ),
         // This marker tells the BVH system to build nested children
         // for this entity, the handle is used to wait till asset is loaded
-        SpawnSceneBvhs,
+        SpawnSceneBvhForTlas(tlas_id), // This will just create the bvh for the meshes and add them to the tlas
     ));
 }

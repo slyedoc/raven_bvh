@@ -22,10 +22,12 @@ impl Default for Hit {
 }
 
 pub trait RayCastExt {
+    
+    /// Get a point at a given distance along the ray
+    fn get_point(&self, distance: f32) -> Vec3A;
+
     /// Converting ray into another space, and how much the range was scaled by
     fn to_local(&self, transform: &GlobalTransform) -> (RayCast3d, f32);
-
-    fn get_point(&self, distance: f32) -> Vec3A;
     
     /// Intersect a triangle with the ray, returning the hit information if it intersects
     fn intersect_triangle(&self, tri: &Tri, tri_index: usize) -> Option<Hit>;
@@ -35,9 +37,7 @@ pub trait RayCastExt {
 }
 
 impl RayCastExt for RayCast3d {
-
-
-    /// Get a point at a given distance along the ray
+    
     #[inline]
     fn get_point(&self, distance: f32) -> Vec3A {
         self.origin + self.direction.as_vec3a() * distance

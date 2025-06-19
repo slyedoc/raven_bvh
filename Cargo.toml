@@ -21,9 +21,7 @@ opt-level = 3
 
 [features]
 default = []
-helpers = [] # Adds SpawnMeshBvh and SpawnSceneBvh
-tlas = [] # Adds Tlas based on all MeshBvh
-camera = ["tlas"] # Adds BvhCamera for debugging
+camera = [] # Adds BvhCamera for debugging
 debug_draw = [] # Enables Drawings Bvh and Tlas
 trace = [] # Enables a few spans
 
@@ -52,12 +50,12 @@ image = "0.25"
 
 [[bench]]
 name = "random_scene"
-required-features = ["camera", "helpers", "tlas"]
+required-features = ["camera"]
 harness = true
 
 [[bench]]
 name = "common"
-required-features = ["camera", "helpers", "tlas"]
+required-features = ["camera"]
 harness = true
 
 
@@ -67,13 +65,13 @@ required-features = []
 
 [[example]]
 name = "tlas"
-required-features = ["camera", "helpers", "debug_draw"]
+required-features = ["camera", "debug_draw"]
 
 [[example]]
 name = "sponza"
-required-features = ["camera", "helpers", "debug_draw"]
+required-features = ["camera", "debug_draw"]
 
 [[example]]
 name = "clock_tower"
-required-features = ["camera", "helpers", "debug_draw"]
+required-features = ["camera", "debug_draw"]
 

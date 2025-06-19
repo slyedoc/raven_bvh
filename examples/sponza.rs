@@ -20,6 +20,12 @@ fn setup(
     mut _materials: ResMut<Assets<StandardMaterial>>,
     asset_server: Res<AssetServer>,
 ) {
+    // add tlas for camera
+    let tlas = commands.spawn((
+        Name::new("Tlas"),
+        Tlas::default(),
+    )).id();
+
     // camera
     commands.spawn((
         Name::new("Main Camera"),
@@ -30,7 +36,7 @@ fn setup(
             ..default()
         },
         Transform::from_xyz(0.0, 2.0, 5.0).looking_at(Vec3::ZERO, Vec3::Y),
-        BvhCamera::new(128, 128),
+        BvhCamera::new(128, 256, tlas),
     ));
 
     // light
@@ -47,6 +53,6 @@ fn setup(
         ),
         // This marker tells the BVH system to build nested children
         // for this entity, waits till asset is loaded
-        SpawnSceneBvhs,
+        SpawnSceneBvhForTlas(tlas),
     ));
 }

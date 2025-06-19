@@ -21,7 +21,7 @@ use crate::{
 // }
 
 /// A TLAS node, which is a node in the top-level acceleration structure (TLAS).
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Reflect)]
 pub enum TlasNodeType {
     Leaf(Entity),
     Branch {
@@ -30,7 +30,7 @@ pub enum TlasNodeType {
     },
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Reflect)]
 pub struct TlasNode {
     pub aabb: Aabb3d,
     pub node_type: TlasNodeType,
@@ -52,10 +52,33 @@ impl TlasNode {
     }
 }
 
-#[derive(Debug, Default, Resource)]
-pub struct Tlas {
+#[derive(Debug, Default, Component, Reflect)]
+#[reflect(Component)]
+#[require(TlasSource, TlasRebuildStrategy)]
+pub struct Tlas {    
     pub tlas_nodes: Vec<TlasNode>,
 }
+
+// Used to add entity with Bvh to a Tlas
+#[derive(Component, Default, Debug, Reflect)]
+#[relationship_target(relationship=TlasTarget)]
+pub struct TlasSource(Vec<Entity>);
+    
+/// Used to limit the number of tlas rebuilds, 
+#[derive(Debug, Component, Default, Reflect)]
+#[reflect(Component)]
+pub enum TlasRebuildStrategy {
+    #[default]
+    Every, // rebuild every update
+    
+    // Note: will tlas becauses outdated 
+    Mannual(bool),  // if true, will be rebuilt flag to false
+}
+
+/// Marker to add a Entity to the TLAS
+#[derive(Component, Debug, Reflect)]
+#[relationship(relationship_target = TlasSource)]
+pub struct TlasTarget(pub Entity);
 
 /// A TLAS is a top-level acceleration structure that contains instances of bottom-level acceleration structures (BLAS).
 impl Tlas {
@@ -79,22 +102,30 @@ impl Tlas {
 
 #[derive(SystemParam)]
 pub struct TlasCast<'w, 's> {
-    pub tlas: Res<'w, Tlas>,
+    
     pub bvhs: Res<'w, Assets<Bvh>>,
+    pub tlases: Query<'w, 's, Read<Tlas>>,
     pub query: Query<'w, 's, (Entity, Read<MeshBvh>, Read<GlobalTransform>)>,
 }
 
 impl<'w, 's> TlasCast<'w, 's> {
-    pub fn intersect_tlas(&self, ray: &RayCast3d) -> Option<(Entity, Hit)> {
+    // if no tlas_e is provided, we will assume there is only one tlas in the scene
+    pub fn intersect_tlas(&self, ray: &RayCast3d, tlas_e: Entity) -> Option<(Entity, Hit)> {
+        
         // PERF: clone the ray so we can update max distance as we find hits to tighten our search,
         // more complex the scene the bigger the performance win
         let mut ray = ray.clone();
-
-        if self.tlas.tlas_nodes.is_empty() || self.query.iter().count() == 0 {
+                
+        let Ok(tlas) = self.tlases.get(tlas_e) else {
+            return None;
+        };
+        
+        // Search the TLAS for the best hit
+        if tlas.tlas_nodes.is_empty() {
             return None;
         }
         let mut stack = Vec::<&TlasNode>::with_capacity(64);
-        let mut node = &self.tlas.tlas_nodes[0];
+        let mut node = &tlas.tlas_nodes[0];
         let mut best_hit: Option<Hit> = None;
         let mut best_entity: Option<Entity> = None;
 
@@ -128,8 +159,8 @@ impl<'w, 's> TlasCast<'w, 's> {
                     }
                 }
                 TlasNodeType::Branch { left, right } => {
-                    let mut child1 = &self.tlas.tlas_nodes[right as usize];
-                    let mut child2 = &self.tlas.tlas_nodes[left as usize];
+                    let mut child1 = &tlas.tlas_nodes[right as usize];
+                    let mut child2 = &tlas.tlas_nodes[left as usize];
                     let mut dist1 = ray.aabb_intersection_at(&child1.aabb);
                     let mut dist2 = ray.aabb_intersection_at(&child2.aabb);
                     if dist1.unwrap_or(f32::MAX) > dist2.unwrap_or(f32::MAX) {

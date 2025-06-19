@@ -1,6 +1,6 @@
 use crate::BvhSystems;
 
-use crate::tlas::{Tlas, TlasCast};
+use crate::tlas::{TlasCast};
 
 use bevy::{
     asset::RenderAssetUsages,
@@ -16,7 +16,7 @@ pub struct BvhCameraPlugin;
 
 impl Plugin for BvhCameraPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<Tlas>().add_systems(
+        app.add_systems(
             PostUpdate,
             (init_camera_image, render_camera, camera_ui)
                 .chain()
@@ -30,14 +30,16 @@ impl Plugin for BvhCameraPlugin {
 pub struct BvhCamera {
     pub width: u32,
     pub height: u32,
+    pub tlas: Entity,
     pub image: Option<Handle<Image>>,
 }
 
 impl BvhCamera {
-    pub fn new(width: u32, height: u32) -> Self {
+    pub fn new(width: u32, height: u32, tlas: Entity) -> Self {
         Self {
             width,
             height,
+            tlas,
             image: None,
         }
     }
@@ -111,7 +113,7 @@ pub fn render_camera(
                             RayCast3d::new(origin, Dir3A::new(direction.into()).unwrap(), 1e30f32);
 
                         // intersect the ray with the TLAS
-                        let color = if let Some((_e, hit)) = tlas_cast.intersect_tlas(&ray) {
+                        let color = if let Some((_e, hit)) = tlas_cast.intersect_tlas(&ray, bvh_camera.tlas) {
                             vec3(hit.u, hit.v, 1.0 - (hit.u + hit.v)) * 255.0
                         } else {
                             Vec3::ZERO

@@ -61,26 +61,33 @@ pub struct Bvh {
 }
 
 impl From<&Mesh> for Bvh {
-    fn from(mesh: &Mesh) -> Self {
-        let triangles = match mesh.primitive_topology() {
-            PrimitiveTopology::TriangleList => {
-                let indexes = match mesh.indices().expect("Mesh should have Indices") {
-                    Indices::U32(vec) => &vec.iter().map(|i| *i as usize).collect::<Vec<_>>(),
-                    Indices::U16(vec) => &vec.iter().map(|i| *i as usize).collect::<Vec<_>>(),
+    fn from(mesh: &Mesh) -> Self {          
+        assert!(
+            matches!(mesh.primitive_topology(), PrimitiveTopology::TriangleList),
+            "`Bvh::from` can only work on `TriangleList`s"
+        );        
+
+        let verts = match mesh
+            .attribute(Mesh::ATTRIBUTE_POSITION)
+            .expect(" Bvh needs Position Attribute")
+        {
+            VertexAttributeValues::Float32x3(vec) => {
+                vec.iter().map(|vec| vec3a(vec[0], vec[1], vec[2]))
+            }
+            _ => unimplemented!(),
+        }
+        .collect::<Vec<_>>();
+
+        // handle indexed geometry and non-indexed geometry
+        let triangles = match mesh.indices() {
+            Some(indexes) => {
+                let indexes = match indexes {
+                    Indices::U32(vec) => vec.iter().map(|i| *i as usize).collect::<Vec<_>>(),
+                    Indices::U16(vec) => vec.iter().map(|i| *i as usize).collect::<Vec<_>>(),
                 };
-                let verts = match mesh
-                    .attribute(Mesh::ATTRIBUTE_POSITION)
-                    .expect("Mesh should have Position Attribute")
-                {
-                    VertexAttributeValues::Float32x3(vec) => {
-                        vec.iter().map(|vec| vec3a(vec[0], vec[1], vec[2]))
-                    }
-                    _ => todo!(),
-                }
-                .collect::<Vec<_>>();
 
                 let mut triangles = Vec::with_capacity(indexes.len() / 3);
-                for tri_indexes in indexes.chunks(3) {
+                for tri_indexes in indexes.chunks(3) {                    
                     triangles.push(Tri::new(
                         verts[tri_indexes[0]],
                         verts[tri_indexes[1]],
@@ -88,8 +95,15 @@ impl From<&Mesh> for Bvh {
                     ));
                 }
                 triangles
-            }
-            _ => unimplemented!(),
+            },
+            None => {
+                let mut triangles = Vec::with_capacity(verts.len() / 3);
+                for v in verts.chunks(3) {
+                    triangles.push(Tri::new(v[0], v[1], v[2]));
+                }
+                triangles
+
+            },
         };
         Self::new(triangles)
     }

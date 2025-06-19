@@ -6,22 +6,21 @@ use bevy::{
 #[cfg(feature = "debug_draw")]
 use crate::{
     bvh::{Bvh, MeshBvh},
-
+    tlas::Tlas,
 };
 
-pub fn aabb3d_global(bounding: &Aabb3d) -> GlobalTransform {
+#[allow(dead_code)]
+pub(crate) fn aabb3d_global(bounding: &Aabb3d) -> GlobalTransform {
     GlobalTransform::from(
         Transform::from_translation(bounding.center().into())
             .with_scale((bounding.max - bounding.min).into()),
     )
 }
 
-pub fn aabb3d_transform(bounding: &Aabb3d, transform: &GlobalTransform) -> GlobalTransform {
+#[allow(dead_code)]
+pub(crate) fn aabb3d_transform(bounding: &Aabb3d, transform: &GlobalTransform) -> GlobalTransform {
     *transform
-        * GlobalTransform::from(
-            Transform::from_translation(bounding.center().into())
-                .with_scale((bounding.max - bounding.min).into()),
-        )
+        * aabb3d_global(bounding)
 }
 
 #[derive(Resource, Default, Debug)]
@@ -29,18 +28,16 @@ pub enum BvhDebugMode {
     #[default]
     Disabled,
     Bvhs,
-    #[cfg(feature = "tlas")]
     Tlas,
 }
 
 #[cfg(feature = "debug_draw")]
-pub fn debug_gimos(
-    
-    query: Query<(&MeshBvh, &GlobalTransform)>,
-    bvhs: Res<Assets<Bvh>>,
-    mut gizmos: Gizmos,
+pub fn debug_gimos(    
+    query: Query<(&MeshBvh, &GlobalTransform)>,    
+    bvhs: Res<Assets<Bvh>>,    
     bvh_debug: Res<BvhDebugMode>,
-    #[cfg(feature = "tlas")] mut tlas: ResMut<crate::tlas::Tlas>,
+    tlases: Query<&Tlas>,
+    mut gizmos: Gizmos,
 ) {
     use bevy::color::palettes::tailwind;
 
@@ -59,17 +56,18 @@ pub fn debug_gimos(
                     gizmos.cuboid(aabb3d_transform(&node.aabb, global_trans), color);
                 }
             }
-        }
-        #[cfg(feature = "tlas")]
+        }        
         BvhDebugMode::Tlas => {
-            for node in tlas.tlas_nodes.iter() {
-                let color = if node.is_leaf() {
-                    tailwind::GREEN_500
-                } else {
-                    tailwind::YELLOW_500
-                };
-                gizmos.cuboid(aabb3d_global(&node.aabb), color);
-            }
+            for tlas in tlases.iter() {
+                for node in tlas.tlas_nodes.iter() {
+                    let color = if node.is_leaf() {
+                        tailwind::GREEN_500
+                    } else {
+                        tailwind::YELLOW_500
+                    };
+                    gizmos.cuboid(aabb3d_global(&node.aabb), color);
+                }
+            }            
         }
     }
 

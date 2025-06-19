@@ -18,13 +18,13 @@ use test::{Bencher, black_box};
 #[test]
 fn scene_1k_1024() {
     // Setup app
-    let (mut app, camera_id) = setup_app::<10, 100, 1024>();
+    let mut app = setup_app::<10, 100, 1024>();
 
     // Run systems
     app.update();
 
     // Check resulting changes
-    let image = get_image(app, camera_id);
+    let image = get_image(app);
 
     let file_path = "tmp/bevy_1k_1024x1024.png";
     image.save(file_path).unwrap();
@@ -45,9 +45,11 @@ fn scene_1k_1024() {
 
 #[test]
 fn scene_100k_1024() {
-    let (mut app, camera_id) = setup_app::<100, 1000, 1024>();
+    let mut app = setup_app::<100, 1000, 1024>();
+    
     app.update();
-    let image = get_image(app, camera_id);
+
+    let image = get_image(app);
 
     let file_path = "tmp/bevy_100k_1024x1024.png";
     image.save(file_path).unwrap();
@@ -69,12 +71,12 @@ fn scene_100k_1024() {
 #[bench]
 fn random_scene_1k_256(b: &mut Bencher) {
     b.iter(|| {
-        let (mut app, camera_id) = setup_app::<10, 100, 256>();
+        let mut app = setup_app::<10, 100, 256>();
 
         app.update();
 
         // Check resulting changes
-        let image = get_image(app, camera_id);
+        let image = get_image(app);
 
         // let file_path = "tmp/bench_1k_256.png";
         // image.save(file_path).unwrap();
@@ -86,11 +88,9 @@ fn random_scene_1k_256(b: &mut Bencher) {
 #[bench]
 pub fn random_scene_100k_256(b: &mut Bencher) {
     b.iter(|| {
-        let (mut app, camera_id) = setup_app::<100, 1000, 256>();
-
+        let mut app = setup_app::<100, 1000, 256>();
         app.update();
-
-        let image = get_image(app, camera_id);
+        let image = get_image(app);
 
         // let file_path = "tmp/bench_100k_256.png";
         //  image.save(file_path).unwrap();
@@ -99,8 +99,14 @@ pub fn random_scene_100k_256(b: &mut Bencher) {
     });
 }
 
+
+#[derive(Resource)]
+struct TestEntities {
+    pub camera: Entity,
+}
+
 fn setup_app<const GROUP_COUNT: usize, const TRI_PER_GROUP: usize, const RESOLUTION: u32>()
--> (App, Entity) {
+-> App {
     let mut app = App::new();
     app.add_plugins((
         MinimalPlugins,
@@ -113,46 +119,14 @@ fn setup_app<const GROUP_COUNT: usize, const TRI_PER_GROUP: usize, const RESOLUT
     ))
     .add_systems(
         Startup,
-        build_random_tri_scene::<GROUP_COUNT, TRI_PER_GROUP>,
+        setup_tri_scene::<GROUP_COUNT, TRI_PER_GROUP, RESOLUTION>,
     );
 
-    // Setup test entities
-    let camera_id = app
-        .world_mut()
-        .spawn((
-            Camera3d::default(),
-            Transform {
-                translation: vec3(0.0, 40.0, 100.0),
-                rotation: Quat::from_axis_angle(Vec3::X, -PI / 6.0),
-                ..Default::default()
-            },
-            BvhCamera::new(RESOLUTION, RESOLUTION),
-        ))
-        .id();
-
-    (app, camera_id)
-}
-
-fn get_image(app: App, camera_id: Entity) -> ImageBuffer<Rgb<u8>, Vec<u8>> {
-    let handle = app
-        .world()
-        .get::<BvhCamera>(camera_id)
-        .expect("Camera image not found")
-        .image
-        .clone()
-        .expect("Image not found");
-    app.world()
-        .resource::<Assets<Image>>()
-        .get(&handle)
-        .expect("Camera image asset not found")
-        .clone()
-        .try_into_dynamic()
-        .expect("Failed to convert image to dynamic")
-        .to_rgb8()
+    app
 }
 
 /// This is odd but its from non-`bevy` code, kept here so I could benchmark vs old code
-fn build_random_tri_scene<const GROUP_COUNT: usize, const TRI_PER_GROUP: usize>(
+fn setup_tri_scene<const GROUP_COUNT: usize, const TRI_PER_GROUP: usize, const RESOLUTION: u32>(
     mut commands: Commands,
     mut bvhs: ResMut<Assets<Bvh>>,
 ) {
@@ -178,8 +152,21 @@ fn build_random_tri_scene<const GROUP_COUNT: usize, const TRI_PER_GROUP: usize>(
             .collect::<Vec<_>>()
     }
 
-    let mut rng = ChaChaRng::seed_from_u64(0);
+    let tlas = commands.spawn(Tlas::default()).id();
+    let camera = commands
+        .spawn((
+            Camera3d::default(),
+            Transform {
+                translation: vec3(0.0, 40.0, 100.0),
+                rotation: Quat::from_axis_angle(Vec3::X, -PI / 6.0),
+                ..Default::default()
+            },
+            BvhCamera::new(RESOLUTION, RESOLUTION, tlas),
+        ))
+        .id();
 
+
+    let mut rng = ChaChaRng::seed_from_u64(0);
     let side_count = (GROUP_COUNT as f32).sqrt().ceil() as u32;
     let offset = 12.0;
     let side_offset = side_count as f32 * offset * 0.5;
@@ -194,7 +181,36 @@ fn build_random_tri_scene<const GROUP_COUNT: usize, const TRI_PER_GROUP: usize>(
                     j as f32 * offset - side_offset + (offset * 0.5),
                 ),
                 MeshBvh(bvhs.add(Bvh::new(tris))),
+                TlasTarget(tlas), // Will make the tlas track this entity
             ));
         }
     }
+
+    commands.insert_resource(TestEntities {
+        camera,
+    });
+}
+
+
+
+fn get_image(app: App) -> ImageBuffer<Rgb<u8>, Vec<u8>> {
+    let TestEntities { camera } = app
+        .world()
+        .resource::<TestEntities>();
+
+    let handle = app
+        .world()
+        .get::<BvhCamera>(*camera)
+        .expect("Camera image not found")
+        .image
+        .clone()
+        .expect("Image not found");
+    app.world()
+        .resource::<Assets<Image>>()
+        .get(&handle)
+        .expect("Camera image asset not found")
+        .clone()
+        .try_into_dynamic()
+        .expect("Failed to convert image to dynamic")
+        .to_rgb8()
 }

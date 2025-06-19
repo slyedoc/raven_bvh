@@ -13,14 +13,24 @@ fn main() {
     App::new()
         .add_plugins((DefaultPlugins, HelperPlugin, BvhPlugin))
         .add_systems(Startup, setup)
+        .add_systems(Update, rotate_boxes)
         .run();
 }
+
+#[derive(Component)]
+pub struct Box;
 
 fn setup(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
+    // add tlas for camera
+    let tlas_id = commands.spawn((
+        Name::new("TLAS"),
+        Tlas::default(),
+    )).id();
+
     // camera
     commands.spawn((
         Name::new("Main Camera"),
@@ -31,7 +41,7 @@ fn setup(
             ..default()
         },
         Transform::from_xyz(0.0, 2.0, 5.0).looking_at(Vec3::ZERO, Vec3::Y),
-        BvhCamera::new(256, 512),
+        BvhCamera::new(256, 512, tlas_id),
     ));
 
     // light
@@ -48,13 +58,14 @@ fn setup(
         MeshMaterial3d(materials.add(StandardMaterial {
             base_color: tailwind::GREEN_900.into(),
             ..default()
-        })),
-        SpawnMeshBvh, // This Marker will have our mesh added
+        })),        
+        SpawnBvhForTlas(tlas_id), // This Marker will have our mesh added
     ));
 
     // testing some nested meshes
     commands.spawn((
         Name::new("Box"),
+        Box,
         Transform::from_xyz(0., 1., 0.).with_scale(Vec3::splat(0.5)),
         children![
             (
@@ -65,7 +76,7 @@ fn setup(
                     base_color: tailwind::GRAY_700.into(),
                     ..default()
                 })),
-                SpawnMeshBvh,
+                SpawnBvhForTlas(tlas_id),
             ),
             (
                 Name::new("Box - Inside2"),
@@ -75,7 +86,7 @@ fn setup(
                     base_color: tailwind::GRAY_700.into(),
                     ..default()
                 })),
-                SpawnMeshBvh,
+                SpawnBvhForTlas(tlas_id),
             )
         ],
     ));
@@ -93,6 +104,7 @@ fn setup(
             Vec3::splat(scale),
             &mut meshes,
             &mut materials,
+            tlas_id,
         ));
     }
 }
@@ -103,6 +115,7 @@ fn spawn_circle(
     scale: Vec3,
     meshes: &mut ResMut<Assets<Mesh>>,
     materials: &mut ResMut<Assets<StandardMaterial>>,
+    tlas: Entity,
 ) -> impl Bundle {
     ((
         Name::new(format!("Target{}", i)),
@@ -112,6 +125,15 @@ fn spawn_circle(
             base_color: tailwind::AMBER_400.into(),
             ..default()
         })),
-        SpawnMeshBvh,
+        SpawnBvhForTlas(tlas),
     ))
+}
+
+fn rotate_boxes(
+    time: Res<Time>,
+    mut query: Query<&mut Transform, With<Box>>,
+) {
+    for mut transform in query.iter_mut() {
+        transform.rotate(Quat::from_rotation_y(time.delta_secs()));
+    }
 }
