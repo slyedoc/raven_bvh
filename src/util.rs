@@ -25,7 +25,7 @@ pub trait RayCastExt {
     /// Get a point at a given distance along the ray
     fn get_point(&self, distance: f32) -> Vec3A;
 
-    /// Converting ray into another space, and how much the range was scaled by
+    /// Converting ray into local space, returns the new ray and the scale factor to convert hits to world space
     fn to_local(&self, transform: &GlobalTransform) -> (RayCast3d, f32);
 
     /// Intersect a triangle with the ray, returning the hit information if it intersects

@@ -1,7 +1,4 @@
-use bevy::{
-    math::bounding::{Aabb3d, BoundingVolume},
-    prelude::*,
-};
+use bevy::prelude::*;
 
 #[cfg(feature = "debug_draw")]
 use crate::{
@@ -9,18 +6,6 @@ use crate::{
     tlas::Tlas,
 };
 
-#[allow(dead_code)]
-pub(crate) fn aabb3d_global(bounding: &Aabb3d) -> GlobalTransform {
-    GlobalTransform::from(
-        Transform::from_translation(bounding.center().into())
-            .with_scale((bounding.max - bounding.min).into()),
-    )
-}
-
-#[allow(dead_code)]
-pub(crate) fn aabb3d_transform(bounding: &Aabb3d, transform: &GlobalTransform) -> GlobalTransform {
-    *transform * aabb3d_global(bounding)
-}
 
 #[derive(Resource, Default, Debug)]
 pub enum BvhDebugMode {

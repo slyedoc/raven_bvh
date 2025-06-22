@@ -56,7 +56,7 @@ impl Plugin for BvhPlugin {
                 helpers::spawn_bvh_for_tlas,
                 helpers::spawn_scene_bvh_for_tlas,
             )
-                .before(BvhSystems::Update),
+                .before(BvhSystems::Update),                
         );
 
         app.add_systems(
@@ -66,7 +66,7 @@ impl Plugin for BvhPlugin {
                 .after(TransformSystem::TransformPropagate),
         )
         .register_type::<Tlas>()
-        .register_type::<TlasSource>()
+        .register_type::<TlasMembers>()
         .register_type::<TlasRebuildStrategy>()
         .register_type::<TlasNodeType>();
 
@@ -82,7 +82,7 @@ impl Plugin for BvhPlugin {
 /// Builds the TLAS from the MeshBvh components in the scene
 /// Should not be called every frame, but for now it for debugging purposes
 pub fn build_tlas(
-    mut tlas: Query<(&mut Tlas, &TlasSource, &mut TlasRebuildStrategy)>,
+    mut tlas: Query<(&mut Tlas, &TlasMembers, &mut TlasRebuildStrategy)>,
     query: Query<(Entity, &MeshBvh, &GlobalTransform)>,
     bvhs: Res<Assets<Bvh>>,
 ) {

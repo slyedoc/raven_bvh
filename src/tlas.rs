@@ -54,7 +54,7 @@ impl TlasNode {
 
 #[derive(Debug, Default, Component, Reflect)]
 #[reflect(Component)]
-#[require(TlasSource, TlasRebuildStrategy)]
+#[require(TlasMembers, TlasRebuildStrategy)]
 pub struct Tlas {
     pub tlas_nodes: Vec<TlasNode>,
 }
@@ -62,7 +62,7 @@ pub struct Tlas {
 // Used to add entity with Bvh to a Tlas
 #[derive(Component, Default, Debug, Reflect)]
 #[relationship_target(relationship=TlasTarget)]
-pub struct TlasSource(Vec<Entity>);
+pub struct TlasMembers(Vec<Entity>);
 
 /// Used to limit the number of tlas rebuilds,
 #[derive(Debug, Component, Default, Reflect)]
@@ -70,14 +70,14 @@ pub struct TlasSource(Vec<Entity>);
 pub enum TlasRebuildStrategy {
     #[default]
     Every, // rebuild every update
-
-    // Note: will tlas becauses outdated
-    Mannual(bool), // if true, will be rebuilt flag to false
+    Mannual(bool), // will rebuild when set to true once
 }
 
-/// Marker to add a Entity to the TLAS
+// TODO: maybe make this generic so entity could be part of many TLASes?
+// Havent need that yet
+/// Marker to add a Entity to the Tlas
 #[derive(Component, Debug, Reflect)]
-#[relationship(relationship_target = TlasSource)]
+#[relationship(relationship_target = TlasMembers)]
 pub struct TlasTarget(pub Entity);
 
 /// A TLAS is a top-level acceleration structure that contains instances of bottom-level acceleration structures (BLAS).
@@ -107,13 +107,10 @@ pub struct TlasCast<'w, 's> {
     pub query: Query<'w, 's, (Entity, Read<MeshBvh>, Read<GlobalTransform>)>,
 }
 
-impl<'w, 's> TlasCast<'w, 's> {
-    // if no tlas_e is provided, we will assume there is only one tlas in the scene
+impl<'w, 's> TlasCast<'w, 's> {    
     pub fn intersect_tlas(&self, ray: &RayCast3d, tlas_e: Entity) -> Option<(Entity, Hit)> {
-        // PERF: clone the ray so we can update max distance as we find hits to tighten our search,
-        // more complex the scene the bigger the performance win
-        let mut ray = ray.clone();
-
+        
+        
         let Ok(tlas) = self.tlases.get(tlas_e) else {
             return None;
         };
@@ -128,6 +125,9 @@ impl<'w, 's> TlasCast<'w, 's> {
         let mut best_hit: Option<Hit> = None;
         let mut best_entity: Option<Entity> = None;
 
+        // PERF: clone the ray so we can update max distance as we find hits to tighten our search,
+        // more complex the scene the bigger the performance win
+        let mut ray = ray.clone();
         loop {
             match node.node_type {
                 TlasNodeType::Leaf(e) => {
